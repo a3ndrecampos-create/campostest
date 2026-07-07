@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Eventos — StreamPanel</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="locked">
+
+<!-- ===================== TOP BAR ===================== -->
+<div class="topbar">
+  <div class="brand">
+    <img src="assets/icons/logo.png" alt="Logo" class="brand-logo">
+  </div>
+  <div class="nav">
+    <button data-view="presets" class="active">Presets</button>
+    <button data-view="overlays">Setup</button>
+    <button data-view="exclusivos" class="exclusivos">⭐ Exclusivos</button>
+    <button data-view="games" class="games-nav">＋ Games</button>
+    <a class="btn-discord" href="https://discord.gg/" target="_blank" rel="noopener">🎮 Discord</a>
+    <button data-view="subscription" class="subscription" style="display:none">Subscription</button>
+  </div>
+  <div class="auth-area" id="auth-area">
+    <input type="email" id="global-email" placeholder="Digite seu e-mail de acesso" autocomplete="email"
+      onkeydown="if(event.key==='Enter'){verificarAcesso();}">
+    <button class="btn btn-primary btn-sm" id="btn-verify-access" onclick="verificarAcesso()">Verificar Acesso</button>
+    <div class="auth-msg" id="auth-msg"></div>
+    <button class="btn btn-ghost btn-sm auth-switch" id="btn-switch-account" onclick="trocarConta()" style="display:none">Trocar conta</button>
+  </div>
+</div>
+
+<!-- ===================== TELA DE BLOQUEIO (verificação obrigatória) ===================== -->
+<div class="lock-screen" id="lock-screen">
+  <div class="lock-box">
+    <div class="lock-icon">🔐</div>
+    <h2>Verificação de Acesso</h2>
+    <p>
+      Bem-vindo(a) à <b>AC Games Interativos</b>.<br>
+      Para continuar, informe no campo localizado no topo da página o e-mail cadastrado com sua licença e clique em
+      <b>Verificar Acesso</b>.<br>
+      Após a validação, o painel será liberado automaticamente.
+    </p>
+    <div class="lock-info">
+      <p class="lock-info-title">📌 Informações Importantes</p>
+      <ul>
+        <li>A plataforma <b>AC Games Interativos</b> utiliza o sistema de assinatura mensal.</li>
+        <li>É necessário possuir uma assinatura ativa para acessar os jogos e seus recursos.</li>
+        <li>A assinatura garante acesso às atualizações, melhorias e novos conteúdos disponibilizados durante o período contratado.</li>
+        <li>Caso sua assinatura esteja expirada ou seu e-mail não seja reconhecido, o acesso ao painel não será liberado.</li>
+      </ul>
+      <p>Obrigado por fazer parte da <b>AC Games Interativos</b>. Desejamos uma ótima experiência!</p>
+    </div>
+    <div class="lock-status" id="lock-status"></div>
+    <a class="btn-first-access" href="https://discord.gg/" target="_blank" rel="noopener">
+      🎮 Primeiro Acesso
+    </a>
+  </div>
+</div>
+
+<div id="app-content">
+
+<!-- ===================== VIEW: PRESETS (lista) ===================== -->
+<div class="view active" id="view-presets">
+  <div class="presets-layout">
+    <div>
+      <div class="section-title">
+        <h1 id="presets-count">My Presets 0/3</h1>
+      </div>
+      <div class="presets-grid" id="presets-list"></div>
+    </div>
+
+    <div class="side-panel">
+      <h3>Novo Preset</h3>
+      <div class="group-label">Jogos</div>
+      <button class="game-btn" onclick="openGameModal()">🎮 Escolher jogo…</button>
+
+      <div class="group-label">Jogos exclusivos liberados</div>
+      <div class="sidebar-games-list" id="sidebar-games-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VIEW: EDITOR DE PRESET ===================== -->
+<div class="view" id="view-editor">
+  <button class="btn btn-ghost" style="margin-bottom:14px" onclick="showView('presets')">← Voltar para Presets</button>
+
+  <div class="editor-head">
+    <div class="left">
+      <img class="game-thumb" id="editor-game-thumb" src="" alt="capa">
+      <div>
+        <div class="eyebrow" id="editor-game-name">Jogo</div>
+        <div class="name-row" id="editor-preset-name">Nome do Preset</div>
+        <div class="id-row">
+          ID: <span id="editor-preset-id"></span>
+          <button class="btn btn-ghost btn-sm" onclick="copyPresetId()">Copiar</button>
+        </div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="mod-box" id="mod-box">
+        <div class="mod-title">Instalação do Mod</div>
+        <div class="mod-row"><span>Pasta do jogo</span><button class="btn btn-primary btn-sm">Selecionar Pasta</button></div>
+        <div class="mod-actions">
+          <button class="btn btn-ghost btn-sm" disabled>Instalar Mod</button>
+          <button class="btn btn-ghost btn-sm">Abrir Pasta</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="left">
+      <button class="btn btn-ghost btn-sm" id="btn-new-trigger" onclick="openTriggerModal()">+ New Trigger</button>
+      <span id="editor-limit">Limit: 12/6</span>
+    </div>
+    <div class="right">
+      <button class="btn btn-danger btn-sm" onclick="deletePresetFromEditor()">Delete Preset</button>
+      <button class="btn btn-ghost btn-sm" onclick="toast('Detalhes do preset em breve')">? Preset details</button>
+      <button class="btn btn-ghost btn-sm" onclick="toast('Eventos parados')">Stop Events Repetition</button>
+      <button class="btn btn-green btn-sm" onclick="savePresetFromEditor()">Save Preset</button>
+    </div>
+  </div>
+
+  <div id="triggers-list"></div>
+
+  <div class="limit-note" id="limit-note"></div>
+</div>
+
+<!-- ===================== VIEW: OVERLAYS ===================== -->
+<div class="view" id="view-overlays">
+  <div class="section-title"><h1>Overlays</h1></div>
+
+  <div class="overlay-bar">
+    <button class="btn btn-primary" onclick="saveOverlayStageImage()">💾 Salvar imagem</button>
+  </div>
+
+  <div class="overlay-stage" id="overlay-stage"></div>
+
+  <div class="overlay-layout">
+    <div>
+      <div class="section-title"><h1>My Presets</h1></div>
+      <div class="preset-chips" id="overlay-preset-chips"></div>
+      <div id="overlay-preset-card"></div>
+    </div>
+
+    <div>
+      <div class="connect-box">
+        <h4>🎵 Connect To TikTok Live</h4>
+        <button class="btn btn-green" id="btn-connect-tikfinity" style="width:100%" onclick="toggleTikFinityConnection()">Connect By Server</button>
+        <div class="tikfinity-status">
+          <span class="dot" id="tikfinity-dot"></span>
+          <span id="tikfinity-label">⚪ Desconectado</span>
+        </div>
+        <div class="help-text" style="margin-bottom:10px">
+          Conecta em <code>ws://localhost:21213/</code> — o mesmo servidor local do
+          <b>TikFinity</b> usado dentro dos jogos. Deixe o TikFinity aberto e rodando.
+        </div>
+        <div class="group-label">Últimos eventos</div>
+        <div class="tikfinity-log" id="tikfinity-log"></div>
+      </div>
+
+      <div class="connect-box">
+        <div class="slider-row">
+          <label>Effects Volume 100%</label>
+          <input type="range" min="0" max="100" value="100">
+        </div>
+      </div>
+
+      <div class="connect-box">
+        <h4>🅺 Connect To Kick.com</h4>
+        <label class="checkbox-row"><input type="checkbox"> Ativar integração com Kick</label>
+        <div class="warn-box" style="margin-top:10px;">Nenhum mod instalado para este jogo.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VIEW: EXCLUSIVOS ===================== -->
+<div class="view" id="view-exclusivos">
+  <div class="section-title">
+    <h1>⭐ Jogos Exclusivos</h1>
+  </div>
+  <div class="games-search" style="margin-bottom:16px;">
+    <input type="text" placeholder="Search games..." oninput="renderExclusivosGrid(this.value)">
+  </div>
+  <div class="games-grid" id="exclusivos-grid"></div>
+</div>
+
+<!-- ===================== VIEW: GAMES ===================== -->
+<div class="view" id="view-games">
+  <div class="section-title">
+    <h1>🎮 Games</h1>
+  </div>
+  <div id="games-access-banner" style="margin-bottom:12px;"></div>
+  <div class="games-search" style="margin-bottom:16px;">
+    <input type="text" placeholder="Search games..." oninput="renderGamesGrid(this.value)">
+  </div>
+  <div class="games-grid" id="all-games-grid"></div>
+</div>
+
+<!-- ===================== VIEW: SUBSCRIPTION ===================== -->
+<div class="view" id="view-subscription">
+  <div class="section-title"><h1>Subscription</h1></div>
+  <div class="empty-state">
+    <div class="big">Plano atual: Gratuito</div>
+    Limite de <b>6 gatilhos</b> por preset e <b>3 presets</b> por conta.
+    Conecte esta tela ao seu sistema de cobrança para exibir planos, upgrade e histórico de pagamento.
+  </div>
+</div>
+
+<!-- ===================== MODAL: ESCOLHER JOGO ===================== -->
+<div class="modal-overlay" id="modal-games">
+  <div class="modal wide">
+    <div class="modal-head">
+      <h3>Escolher Jogo</h3>
+      <button onclick="closeGameModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="games-search">
+        <input type="text" placeholder="Search games..." oninput="renderGameGrid(this.value)">
+      </div>
+      <div class="games-grid" id="games-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: NOVO / EDITAR GATILHO ===================== -->
+<div class="modal-overlay" id="modal-trigger">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="trigger-modal-title">Novo Gatilho</h3>
+      <button onclick="closeTriggerModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="field-row two">
+        <div class="field">
+          <label>Evento</label>
+          <select id="f-event" onchange="updateTriggerFieldVisibility()"></select>
+        </div>
+        <div class="field">
+          <label>Ação</label>
+          <select id="f-action"></select>
+        </div>
+      </div>
+
+      <div class="field" id="row-gift" style="display:none">
+        <label>Escolha o presente</label>
+        <div class="gift-grid" id="gift-grid"></div>
+        <div class="help-text" id="gift-selected-label"></div>
+      </div>
+
+      <div class="field" id="row-count" style="display:none">
+        <label id="f-count-label">Quantidade</label>
+        <input type="number" id="f-count" min="1" value="1">
+      </div>
+
+      <div class="field" id="row-text" style="display:none">
+        <label id="f-text-label">Texto</label>
+        <input type="text" id="f-text">
+      </div>
+
+      <div class="field">
+        <label>Parâmetro do comando (ex: nome do zumbi, item, quantidade)</label>
+        <input type="text" id="f-param" placeholder="ex: zombieSteve">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Repetição</label>
+          <input type="number" id="f-repetition" min="1" value="1">
+        </div>
+        <div class="field">
+          <label>Intervalo (ms)</label>
+          <input type="number" id="f-interval" min="0" value="100">
+        </div>
+        <div class="field">
+          <label>Delay (ms)</label>
+          <input type="number" id="f-delay" min="0" value="0">
+        </div>
+      </div>
+
+      <label class="checkbox-row" style="margin-bottom:14px">
+        <input type="checkbox" id="f-multiplier"> Multiplicador (repete conforme a quantidade recebida)
+      </label>
+
+      <div class="field-row two">
+        <div class="field">
+          <label>Áudio selecionado</label>
+          <input type="text" id="f-audio-name" readonly placeholder="Nenhum áudio">
+        </div>
+        <div class="field">
+          <label>Volume do áudio (%)</label>
+          <input type="number" id="f-audio-volume" min="0" max="100" value="100">
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="openAudioModal(true)">🔊 Selecionar Áudio</button>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeTriggerModal()">Cancelar</button>
+      <button class="btn btn-green" onclick="saveTriggerFromModal()">Salvar Gatilho</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: SELECIONAR ÁUDIO ===================== -->
+<div class="modal-overlay" id="modal-audio">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Select Audio</h3>
+      <button onclick="closeAudioModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="audio-tabs">
+        <button class="active">Public Audio</button>
+        <button>My Cloud Audio</button>
+      </div>
+      <input type="text" placeholder="Search" style="width:100%; margin-bottom:12px;"
+        oninput="renderAudioList(this.value)">
+      <div class="audio-list" id="audio-list"></div>
+      <div class="help-text">
+        Coloque seus próprios arquivos .mp3 em <code>assets/audio/public/</code> ou
+        <code>assets/audio/user/</code> e ligue esta lista a eles.
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /#app-content -->
+
+<!-- ===================== TOAST ===================== -->
+<div class="toast" id="toast"></div>
+
+<script src="js/data.js?v=20260707"></script>
+<script src="js/app.js?v=20260707"></script>
+</body>
+</html>

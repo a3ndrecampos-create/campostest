@@ -1,0 +1,3175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Squid Run</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:#111;display:flex;flex-direction:column;align-items:center;min-height:100vh;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;font-family:Arial,sans-serif;}
+  #appWrap{width:520px;}
+  #gameContainer{position:relative;width:520px;height:844px;overflow:hidden;}
+  #gameCanvas{position:absolute;top:0;left:0;width:520px;height:844px;display:block;}
+  #hud{position:absolute;top:12px;left:0;right:0;display:flex;justify-content:center;padding:0 14px;pointer-events:none;z-index:10;}
+  .hudBox{background:#000;border:2px solid #333;border-radius:10px;padding:5px 24px;color:#fff;font-family:'Arial Black',sans-serif;font-size:15px;font-weight:900;}
+  .hudBox span{color:#e74c3c;}
+  #joystickZone{display:none;}
+  #btnRun{display:none;}
+  #damageFlash{position:absolute;inset:0;background:rgba(231,76,60,0);pointer-events:none;z-index:50;transition:background .08s;}
+  #eliminadosPanel{
+    position:absolute;
+    top:8px;
+    left:8px;
+    width:72px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    z-index:15;
+    pointer-events:none;
+  }
+  .elimCard{
+    position:relative;
+    width:64px;
+    height:64px;
+    border-radius:10px;
+    overflow:hidden;
+    border:2px solid #555;
+    background:#111;
+    animation:elimEntrada .3s ease;
+  }
+  .elimCard canvas{width:64px;height:64px;display:block;}
+  .elimX{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:44px;
+    font-weight:900;
+    color:#e74c3c;
+    text-shadow:0 0 8px #000,0 0 2px #000;
+    opacity:0;
+    transition:opacity .3s;
+    line-height:1;
+  }
+  .elimX.show{opacity:1;}
+  @keyframes elimEntrada{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+  #startScreen,#gameOverScreen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;}
+  #startScreen{background:rgba(0,0,0,0.80);}
+  #gameOverScreen{background:rgba(0,0,0,0.85);display:none;}
+  h1,h2{font-family:'Arial Black',sans-serif;font-weight:900;}
+  #startScreen h1{color:#f7c948;font-size:40px;text-shadow:0 0 24px rgba(247,201,72,0.9);letter-spacing:3px;margin-bottom:8px;}
+  #gameOverScreen h2{color:#e74c3c;font-size:42px;text-shadow:0 0 20px rgba(231,76,60,0.8);letter-spacing:3px;margin-bottom:8px;}
+  #startScreen p,#scoreDisplay{color:rgba(255,255,255,0.75);font-family:Arial,sans-serif;font-size:14px;margin-bottom:36px;}
+  #btnStart,#btnRestart{font-family:'Arial Black',sans-serif;font-weight:900;border:none;border-radius:50px;cursor:pointer;letter-spacing:2px;text-transform:uppercase;}
+  #btnStart{background:linear-gradient(135deg,#f7c948,#e67e22);color:#1a0a0a;font-size:22px;padding:15px 50px;box-shadow:0 6px 24px rgba(247,201,72,0.5);}
+  #btnRestart{background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;font-size:18px;padding:14px 40px;}
+
+  /* ── NOTIFICAÇÕES DE EVENTOS ── */
+  #eventNotifPanel{
+    position:absolute;
+    bottom:14px;
+    right:10px;
+    width:220px;
+    display:flex;
+    flex-direction:column-reverse;
+    gap:5px;
+    z-index:60;
+    pointer-events:none;
+  }
+  .evNotif{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    background:rgba(0,0,0,0.82);
+    border:1px solid #333;
+    border-radius:8px;
+    padding:5px 8px;
+    animation:evSlideIn .3s ease;
+    font-size:11px;
+    color:#fff;
+    line-height:1.3;
+  }
+  .evNotif .evAvatar{
+    width:32px;height:32px;border-radius:50%;flex-shrink:0;object-fit:cover;border:2px solid #555;
+  }
+  .evNotif .evText{flex:1;}
+  .evNotif .evText b{color:#f7c948;}
+  @keyframes evSlideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+
+  #bottom-controls{width:520px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;background:#000;padding:8px;border:1px solid #e74c3c;border-top:none;border-radius:0 0 10px 10px;box-sizing:border-box;}
+  #conn-status{font-size:9px;display:none;align-items:center;gap:5px;color:#888;font-weight:bold;}
+  .dot{width:9px;height:9px;background:#444;border-radius:50%;box-shadow:0 0 5px #000;}
+  .dot.online{background:#2ecc71;box-shadow:0 0 8px #2ecc71;}
+  #player-tools{display:flex;gap:5px;border-left:1px solid #222;border-right:1px solid #222;padding:0 8px;align-items:center;}
+  #player-name-input{padding:5px;background:#111;border:1px solid #333;color:#e74c3c;border-radius:4px;font-size:9px;width:100px;text-transform:uppercase;}
+  .btn-action{padding:5px 7px;background:#222;border:1px solid #444;color:#fff;cursor:pointer;border-radius:4px;font-size:9px;font-weight:bold;}
+  #btn-config{display:none;padding:5px 9px;background:#111;border:1px solid #333;color:#888;cursor:pointer;border-radius:4px;font-size:9px;}
+  #btn-audio{padding:5px 9px;background:#111;border:1px solid #333;color:#fff;cursor:pointer;border-radius:4px;font-size:9px;font-weight:bold;}
+
+  .modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:92vw;max-width:560px;max-height:88vh;overflow-y:auto;background:#111;border:2px solid #e74c3c;border-radius:12px;padding:14px;z-index:3000;display:none;color:#fff;box-shadow:0 0 20px rgba(0,0,0,0.9);box-sizing:border-box;}
+  .modal-section{background:#161616;border:1px solid #222;border-radius:6px;padding:8px 10px;margin-bottom:10px;box-sizing:border-box;}
+  .modal-section-title{font-size:11px;color:#e74c3c;text-transform:uppercase;font-weight:bold;margin-bottom:6px;letter-spacing:0.5px;}
+  .form-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:2px;align-items:center;}
+  .input-dark{padding:6px 8px;background:#000;color:#fff;border:1px solid #333;border-radius:4px;font-size:11px;box-sizing:border-box;}
+  .select-dark{padding:6px 8px;background:#000;color:#fff;border:1px solid #333;border-radius:4px;font-size:11px;height:30px;box-sizing:border-box;}
+  .btn-add{background:#e74c3c;border:none;color:#fff;padding:6px 12px;cursor:pointer;font-weight:bold;font-size:11px;border-radius:4px;height:30px;}
+  .btn-add:hover{background:#c0392b;}
+  .event-list-container{max-height:110px;overflow-y:auto;background:#090909;border:1px solid #222;border-radius:4px;padding:2px 4px;box-sizing:border-box;}
+  .event-item{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;font-size:11px;border-bottom:1px solid #161616;}
+  .event-item:last-child{border-bottom:none;}
+  .event-actions-group{display:flex;gap:6px;align-items:center;}
+  .btn-test{background:#27ae60;color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:bold;}
+  .btn-test:hover{background:#219653;}
+  .btn-del{color:#e74c3c;cursor:pointer;font-weight:bold;background:transparent;border:none;padding:0 2px;font-size:14px;}
+  .btn-del:hover{color:#fff;}
+  .btn-reset{width:100%;margin-top:5px;padding:8px;background:#c0392b;color:#fff;border:none;font-weight:bold;cursor:pointer;border-radius:4px;font-size:11px;box-sizing:border-box;}
+
+  /* ── POPUP SIMPLES DE AJUSTE DE TEMPO ── */
+  .timerPopupOverlay{
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.7);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:4000;
+  }
+  .timerPopupOverlay.open{display:flex;}
+  .timerPopupBox{
+    background:#111;
+    border:2px solid #e74c3c;
+    border-radius:14px;
+    padding:22px 26px;
+    width:260px;
+    text-align:center;
+    box-shadow:0 8px 30px rgba(0,0,0,0.8);
+    animation:timerPopupIn .18s ease;
+  }
+  @keyframes timerPopupIn{from{opacity:0;transform:scale(0.9);}to{opacity:1;transform:scale(1);}}
+  .timerPopupTitle{color:#e74c3c;font-size:16px;font-weight:900;font-family:'Arial Black',sans-serif;margin-bottom:4px;}
+  .timerPopupSub{color:#999;font-size:11px;margin-bottom:16px;}
+  .timerPopupControls{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:20px;}
+  .timerStepBtn{
+    width:38px;height:38px;
+    background:#222;border:1px solid #444;color:#fff;
+    font-size:20px;font-weight:900;
+    border-radius:8px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    line-height:1;
+  }
+  .timerStepBtn:active{background:#333;}
+  .timerPopupInput{
+    width:90px;
+    text-align:center;
+    background:#000;
+    color:#f7c948;
+    border:1px solid #333;
+    border-radius:8px;
+    font-size:24px;
+    font-weight:900;
+    font-family:'Arial Black',sans-serif;
+    padding:8px 4px;
+  }
+  .timerPopupActions{display:flex;gap:10px;}
+  .timerPopupBtn{
+    flex:1;
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    font-weight:bold;
+    font-size:12px;
+    cursor:pointer;
+    text-transform:uppercase;
+  }
+  .timerPopupBtn.cancel{background:#333;color:#ccc;}
+  .timerPopupBtn.cancel:hover{background:#444;}
+  .timerPopupBtn.confirm{background:#27ae60;color:#fff;}
+  .timerPopupBtn.confirm:hover{background:#219653;}
+
+
+</style>
+</head>
+<body>
+<div id="appWrap">
+  <div id="gameContainer">
+  <canvas id="gameCanvas" width="520" height="844"></canvas>
+  <div id="hud">
+    <div class="hudBox">⏱ <span id="timerNum">1:00</span></div>
+  </div>
+  <div id="joystickZone">
+    <div id="joystickBase"><div id="joystickKnob"></div></div>
+  </div>
+  <div id="btnRun">CORRER</div>
+  <div id="eliminadosPanel"></div>
+  <div id="eventNotifPanel"></div>
+  <div id="damageFlash"></div>
+  <div id="startScreen">
+    <h1>SQUID RUN</h1>
+    <p>Clique para andar · Tecla 1 para correr · Pare quando a boneca virar!</p>
+    <button id="btnStart">JOGAR</button>
+  </div>
+  <div id="gameOverScreen">
+    <h2 id="gameOverTitle">TODOS ELIMINADOS!</h2>
+    <div id="scoreDisplay" style="display:none;">Pontuação: <span id="finalScore">0</span></div>
+    <div id="restartCountdown" style="color:rgba(255,255,255,0.6);font-family:Arial,sans-serif;font-size:18px;margin-top:10px;"></div>
+  </div>
+  </div>
+
+  <div id="bottom-controls">
+    <div id="conn-status">
+      <div id="connDot" class="dot"></div> TIKFINITY
+    </div>
+    <div id="player-tools">
+      <input type="text" id="player-name-input" placeholder="NOME DO JOGADOR">
+      <button class="btn-action" onclick="playerSelfSpawn()">Spawn</button>
+      <button class="btn-action" onclick="voltarTelaInicial()" style="background:#1a3a5c;border-color:#2980b9;color:#5dade2;">⏮ Início</button>
+      <button class="btn-action" onclick="limparMortos()" style="background:#333;border-color:#666;color:#aaa;">🗑 Limpar</button>
+    </div>
+    <button id="btn-config" onclick="toggleModal()">⚙️ CONFIG</button>
+    <button id="btn-timer" class="btn-action" onclick="openTimerPopup()">⏱ TEMPO</button>
+    <button id="btn-audio" onclick="toggleAudio()">🔊 ÁUDIO: LIGADO</button>
+  </div>
+
+  <div id="configModal" class="modal">
+    <h3 style="margin:0 0 10px 0; color:#e74c3c; font-size:15px; font-weight: 900; text-align: center;">⚙️ GERENCIADOR DE EVENTOS INTERATIVOS — SQUID RUN</h3>
+
+    <div class="modal-section">
+      <div class="modal-section-title">⏱️ Tempo Inicial do Cronômetro</div>
+      <div class="form-row" style="align-items:center; gap:10px;">
+        <span style="font-size:11px;color:#aaa;white-space:nowrap;">Duração da rodada:</span>
+        <input type="number" id="timerInitInput" class="input-dark" style="width:70px;text-align:center;" min="10" max="600" value="60">
+        <span style="font-size:11px;color:#aaa;">segundos</span>
+        <button onclick="saveTimerConfig()" class="btn-add" style="background:#27ae60;white-space:nowrap;">SALVAR</button>
+        <span id="timerSavedMsg" style="font-size:11px;color:#2ecc71;display:none;">✔ Salvo!</span>
+      </div>
+      <div style="font-size:10px;color:#666;margin-top:4px;">Este valor será usado na próxima partida. O padrão é 60s.</div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-title">⚡ Configuração Isolada de Likes</div>
+      <div class="form-row">
+        <span style="font-size: 11px; color: #aaa;">A cada</span>
+        <input type="number" id="likeThresholdInput" class="input-dark" style="width: 60px; text-align: center;" min="1" value="20">
+        <span style="font-size: 11px; color: #aaa;">Likes, executar:</span>
+        <select id="likeActionSelect" class="select-dark" style="flex: 1;">
+          <option value="SPAWN_JOGADOR">Spawn Jogador</option>
+          <option value="SPAWN_DRONE">Drone Alvo</option>
+          <option value="SPAWN_DRONE_GRANDE">Drone Grande</option>
+          <option value="SPAWN_MINAS">Minas x10</option>
+          <option value="SPAWN_BOMBA">Bomba</option>
+          <option value="ESCUDO">Escudo</option>
+          <option value="TEMPO_MAIS20">+20 Segundos</option>
+          <option value="TEMPO_MENOS20">-20 Segundos</option>
+          <option value="FORCAR_ANDAR">Andar (até parar)</option>
+          <option value="FORCAR_CORRER">Correr (até parar)</option>
+                  <option value="FORCAR_PARAR">Parar movimento</option>
+        </select>
+        <button onclick="saveLikeConfig()" class="btn-add" style="background: #27ae60;">SALVAR</button>
+        <button onclick="testTrigger('curtida_like')" class="btn-test" style="height: 30px;">TESTAR</button>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-title">👑 Configuração de Novo Membro (Member)</div>
+      <div class="form-row">
+        <span style="font-size: 11px; color: #aaa; flex: 1;">Quando um usuário se tornar membro:</span>
+        <select id="memberActionSelect" class="select-dark" style="width: 180px;">
+          <option value="SPAWN_JOGADOR">Spawn Jogador</option>
+          <option value="SPAWN_DRONE">Drone Alvo</option>
+          <option value="SPAWN_DRONE_GRANDE">Drone Grande</option>
+          <option value="SPAWN_MINAS">Minas x10</option>
+          <option value="SPAWN_BOMBA">Bomba</option>
+          <option value="ESCUDO">Escudo</option>
+          <option value="TEMPO_MAIS20">+20 Segundos</option>
+          <option value="TEMPO_MENOS20">-20 Segundos</option>
+          <option value="FORCAR_ANDAR">Andar (até parar)</option>
+          <option value="FORCAR_CORRER">Correr (até parar)</option>
+          <option value="FORCAR_PARAR">Parar movimento</option>
+        </select>
+        <span style="font-size: 11px; color: #aaa;">x</span>
+        <input type="number" id="memberRepeatInput" class="input-dark" style="width: 44px; text-align: center;" min="1" max="20" value="1" title="Repetições">
+        <button onclick="saveMemberConfig()" class="btn-add" style="background: #27ae60;">SALVAR</button>
+        <button onclick="testTrigger('membro')" class="btn-test" style="height: 30px;">TESTAR</button>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-title">📤 Configuração de Compartilhamento (Share)</div>
+      <div class="form-row">
+        <span style="font-size: 11px; color: #aaa; flex: 1;">Quando um usuário compartilhar a live:</span>
+        <select id="shareActionSelect" class="select-dark" style="width: 180px;">
+          <option value="SPAWN_JOGADOR">Spawn Jogador</option>
+          <option value="SPAWN_DRONE">Drone Alvo</option>
+          <option value="SPAWN_DRONE_GRANDE">Drone Grande</option>
+          <option value="SPAWN_MINAS">Minas x10</option>
+          <option value="SPAWN_BOMBA">Bomba</option>
+          <option value="ESCUDO">Escudo</option>
+          <option value="TEMPO_MAIS20">+20 Segundos</option>
+          <option value="TEMPO_MENOS20">-20 Segundos</option>
+          <option value="FORCAR_ANDAR">Andar (até parar)</option>
+          <option value="FORCAR_CORRER">Correr (até parar)</option>
+                  <option value="FORCAR_PARAR">Parar movimento</option>
+        </select>
+        <span style="font-size: 11px; color: #aaa;">x</span>
+        <input type="number" id="shareRepeatInput" class="input-dark" style="width: 44px; text-align: center;" min="1" max="20" value="1" title="Repetições">
+        <button onclick="saveShareConfig()" class="btn-add" style="background: #27ae60;">SALVAR</button>
+        <button onclick="testTrigger('compartilhar')" class="btn-test" style="height: 30px;">TESTAR</button>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-title">🎁 Mapear Presentes & Comandos de Chat</div>
+      <div class="form-row">
+                <select id="giftSelector" class="select-dark" style="width: 240px;" onchange="syncGiftInput()">
+                    <option value="">-- Escolha um Presente --</option>
+                    <option value="CUSTOM">-- DIGITAR COMANDO DE CHAT --</option>
+                    <option value="14295">14295 - Dates</option>
+                    <option value="6926">6926 - Basketball</option>
+                    <option value="7250">7250 - Hot Water Bottle</option>
+                    <option value="13298">13298 - Wink Charm</option>
+                    <option value="13651">13651 - Go Popular</option>
+                    <option value="13282">13282 - Slay</option>
+                    <option value="12355">12355 - Club Cheers</option>
+                    <option value="9097">9097 - Birthday Cake</option>
+                    <option value="7073">7073 - Harvest Festival</option>
+                    <option value="9087">9087 - Flame Heart</option>
+                    <option value="7934">7934 - Heart Me</option>
+                    <option value="7213">7213 - Squirrel</option>
+                    <option value="6652">6652 - Lightning Bolt</option>
+                    <option value="6784">6784 - Cake Slice</option>
+                    <option value="6912">6912 - Sem descrição</option>
+                    <option value="5868">5868 - Sem descrição</option>
+                    <option value="7002">7002 - Garden Gnome</option>
+                    <option value="7038">7038 - Sem descrição</option>
+                    <option value="6890">6890 - Love You</option>
+                    <option value="5867">5867 - Sem descrição</option>
+                    <option value="5631">5631 - Sem descrição</option>
+                    <option value="5630">5630 - Sem descrição</option>
+                    <option value="5333">5333 - Coffee</option>
+                    <option value="6247">6247 - Heart</option>
+                    <option value="6246">6246 - Thumbs Up</option>
+                    <option value="6169">6169 - Tennis</option>
+                    <option value="6064">6064 - GG</option>
+                    <option value="6042">6042 - Mini Speaker</option>
+                    <option value="5827">5827 - Ice Cream Cone</option>
+                    <option value="5760">5760 - Weights</option>
+                    <option value="5655">5655 - Rose</option>
+                    <option value="5269">5269 - TikTok</option>
+                    <option value="9139">9139 - Team Bracelet</option>
+                    <option value="7136">7136 - Golden Player</option>
+                    <option value="10179">10179 - Lily of the Valley</option>
+                    <option value="10268">10268 - Easter Egg</option>
+                    <option value="12865">12865 - Bread</option>
+                    <option value="10604">10604 - Tofu</option>
+                    <option value="9287">9287 - Potato</option>
+                    <option value="8815">8815 - Pink Shoes</option>
+                    <option value="6813">6813 - Sem descrição</option>
+                    <option value="6705">6705 - Sem descrição</option>
+                    <option value="5983">5983 - Sem descrição</option>
+                    <option value="5547">5547 - Sem descrição</option>
+                    <option value="6416">6416 - Choc Chip Cookie</option>
+                    <option value="5719">5719 - Fire</option>
+                    <option value="5650">5650 - Mic</option>
+                    <option value="5487">5487 - Finger Heart</option>
+                    <option value="37">37 - Panda</option>
+                    <option value="6519">6519 - Guacamole</option>
+                    <option value="12356">12356 - Club Power</option>
+                    <option value="9622">9622 - Applause</option>
+                    <option value="8243">8243 - Cheer You Up</option>
+                    <option value="6484">6484 - Sem descrição</option>
+                    <option value="6113">6113 - Taco</option>
+                    <option value="6059">6059 - Hand Wave</option>
+                    <option value="13300">13300 - Heart Gaze</option>
+                    <option value="14560">14560 - Easter Potato</option>
+                    <option value="11108">11108 - EWC</option>
+                    <option value="5853">5853 - Gold Boxing Gloves</option>
+                    <option value="10521">10521 - Cherry Blossom Bunny</option>
+                    <option value="9947">9947 - Friendship Necklace</option>
+                    <option value="9458">9458 - ASMR Time</option>
+                    <option value="8913">8913 - Rosa</option>
+                    <option value="7341">7341 - Panther</option>
+                    <option value="6483">6483 - Sem descrição</option>
+                    <option value="6458">6458 - Sem descrição</option>
+                    <option value="6560">6560 - Tiny Diny</option>
+                    <option value="6240">6240 - Sem descrição</option>
+                    <option value="5984">5984 - Sem descrição</option>
+                    <option value="5327">5327 - Sem descrição</option>
+                    <option value="6249">6249 - Rugby Ball</option>
+                    <option value="6052">6052 - Gamepad</option>
+                    <option value="5657">5657 - Lollipop</option>
+                    <option value="14115">14115 - S Flowers</option>
+                    <option value="8552">8552 - Baby Fox</option>
+                    <option value="5740">5740 - Headphones</option>
+                    <option value="5919">5919 - Love You</option>
+                    <option value="5658">5658 - Perfume</option>
+                    <option value="5780">5780 - Bouquet Flower</option>
+                    <option value="6070">6070 - Mirror</option>
+                    <option value="5879">5879 - Doughnut</option>
+                    <option value="5852">5852 - Sem descrição</option>
+                    <option value="8259">8259 - Sign Language Love</option>
+                    <option value="5707">5707 - Love You</option>
+                    <option value="6047">6047 - Sem descrição</option>
+                    <option value="5792">5792 - Sem descrição</option>
+                    <option value="5584">5584 - Sem descrição</option>
+                    <option value="5530">5530 - Sem descrição</option>
+                    <option value="10300">10300 - Butterfly</option>
+                    <option value="8434">8434 - Ruby Red</option>
+                    <option value="7037">7037 - Sem descrição</option>
+                    <option value="6471">6471 - Hi May</option>
+                    <option value="9575">9575 - Family</option>
+                    <option value="9582">9582 - Sending Strength</option>
+                    <option value="14287">14287 - Murtabak</option>
+                    <option value="14126">14126 - Crescent Chain</option>
+                    <option value="14109">14109 - Mark of Love</option>
+                    <option value="13087">13087 - Bubble Gum</option>
+                    <option value="11180">11180 - Love Painting</option>
+                    <option value="12357">12357 - Club Victory</option>
+                    <option value="12678">12678 - Level-up Sparks</option>
+                    <option value="9096">9096 - Birthday Crown</option>
+                    <option value="8156">8156 - My Favourite</option>
+                    <option value="8130">8130 - Like-Pop</option>
+                    <option value="7883">7883 - Guitar</option>
+                    <option value="6525">6525 - Honorable Person</option>
+                    <option value="6559">6559 - Breakthrough Star</option>
+                    <option value="6793">6793 - Ranking Lit</option>
+                    <option value="6723">6723 - Guitar</option>
+                    <option value="5793">5793 - Play Samba</option>
+                    <option value="6435">6435 - Daffodils</option>
+                    <option value="6432">6432 - Star</option>
+                    <option value="6386">6386 - Sem descrição</option>
+                    <option value="6427">6427 - Hat and Mustache</option>
+                    <option value="6097">6097 - Little Crown</option>
+                    <option value="6104">6104 - Cap</option>
+                    <option value="5659">5659 - Paper Crane</option>
+                    <option value="13301">13301 - Singing Magic</option>
+                    <option value="7121">7121 - Marvelous Confetti</option>
+                    <option value="7264">7264 - Mishka Bear</option>
+                    <option value="7163">7163 - Mishka Bear</option>
+                    <option value="6968">6968 - Hand Heart</option>
+                    <option value="6960">6960 - Game Controller</option>
+                    <option value="6467">6467 - Game Controller</option>
+                    <option value="5566">5566 - Mishka Bear</option>
+                    <option value="5585">5585 - Confetti</option>
+                    <option value="5660">5660 - Hand Hearts</option>
+                    <option value="14000">14000 - Bowknot</option>
+                    <option value="6618">6618 - Socks and Sandals</option>
+                    <div style="display:none;" id="ghost-anchors"></div>
+                    <option value="5328">5328 - Sem descrição</option>
+                    <option value="5729">5729 - Butterfly</option>
+                    <option value="5915">5915 - Music Note</option>
+                    <option value="14294">14294 - Sparklers</option>
+                    <option value="14474">14474 - Ramadan Moon</option>
+                    <option value="13981">13981 - Love Charger</option>
+                    <option value="13075">13075 - Cheering Crab</option>
+                    <option value="11177">11177 - Coffee Magic</option>
+                    <option value="10573">10573 - Massage for You</option>
+                    <option value="10560">10560 - Stinging Bee</option>
+                    <option value="9589">9589 - Birthday Glasses</option>
+                    <option value="8600">8600 - Sending Positivity</option>
+                    <option value="8066">8066 - Goggles</option>
+                    <option value="7927">7927 - Puppy Love</option>
+                    <option value="7839">7839 - Shiba Inu</option>
+                    <option value="7549">7549 - Gamer Cat</option>
+                    <option value="7166">7166 - Roman Empire</option>
+                    <option value="6713">6713 - Cheer For You</option>
+                    <option value="6619">6619 - Sem descrição</option>
+                    <option value="6795">6795 - Ranking Lit</option>
+                    <option value="6794">6794 - Ranking Lit</option>
+                    <option value="6796">6796 - Ranking Lit</option>
+                    <option value="6744">6744 - Sem descrição</option>
+                    <option value="6671">6671 - Love You</option>
+                    <option value="6486">6486 - Sem descrição</option>
+                    <option value="5794">5794 - Sem descrição</option>
+                    <option value="6436">6436 - Love Focus</option>
+                    <option value="6437">6437 - Garland Headpiece</option>
+                    <option value="6194">6194 - Sem descrição</option>
+                    <option value="5937">5937 - Hanging Lights</option>
+                    <option value="5880">5880 - Lock and Key</option>
+                    <option value="5586">5586 - Hearts</option>
+                    <option value="5734">5734 - Goggles</option>
+                    <option value="5509">5509 - Sunglasses</option>
+                    <option value="5896">5896 - Sem descrição</option>
+                    <option value="5599">5599 - Gold Necklace</option>
+                    <option value="5326">5326 - Sem descrição</option>
+                    <option value="10547">10547 - Pinch Face</option>
+                    <option value="5532">5532 - Sem descrição</option>
+                    <option value="14142">14142 - Ramadan Crescent</option>
+                    <option value="8141">8141 - Ramadan Crescent</option>
+                    <option value="14418">14418 - Ramadan Crescent</option>
+                    <option value="13073">13073 - Butterfly for You</option>
+                    <option value="11808">11808 - Rock Star</option>
+                    <option value="11183">11183 - Play for You</option>
+                    <option value="11179">11179 - Naughty Chicken</option>
+                    <option value="10574">10574 - Dancing Flower</option>
+                    <option value="9465">9465 - Fruit Friends</option>
+                    <option value="8873">8873 - TikTok Crown</option>
+                    <option value="8260">8260 - Elephant Trunk</option>
+                    <option value="7503">7503 - We Love</option>
+                    <option value="8111">8111 - Superpower</option>
+                    <option value="7222">7222 - Full Moon</option>
+                    <option value="6868">6868 - Hedgehog</option>
+                    <option value="6752">6752 - Friend</option>
+                    <option value="6531">6531 - Sem descrição</option>
+                    <option value="6532">6532 - Dancing Cactus</option>
+                    <option value="6050">6050 - Sem descrição</option>
+                    <option value="6034">6034 - Sem descrição</option>
+                    <option value="5902">5902 - Bridal Veil</option>
+                    <option value="6265">6265 - Duck</option>
+                    <option value="6267">6267 - Corgi</option>
+                    <option value="6007">6007 - Boxing Gloves</option>
+                    <option value="5882">5882 - Rock 'n' Roll</option>
+                    <option value="13987">13987 - Feather Mask</option>
+                    <option value="5329">5329 - Sem descrição</option>
+                    <option value="5661">5661 - Air Dancer</option>
+                    <option value="6071">6071 - Birthday Cake</option>
+                    <option value="5843">5843 - Sem descrição</option>
+                    <option value="14214">14214 - Let Butterfly Dances</option>
+                    <option value="14507">14507 - Ketupat Tree</option>
+                    <option value="14131">14131 - Ramadan Gift Box</option>
+                    <option value="14110">14110 - You Are Loved</option>
+                    <option value="11181">11181 - Tom's Hug</option>
+                    <option value="11178">11178 - Relaxed Goose</option>
+                    <option value="12210">12210 - Rosie the Rose Bean</option>
+                    <option value="12211">12211 - Jollie the Joy Bean</option>
+                    <option value="12212">12212 - Rocky the Rock Bean</option>
+                    <option value="12213">12213 - Sage the Smart Bean</option>
+                    <option value="10395">10395 - Gaming Headset</option>
+                    <option value="8107">8107 - Flower Flight</option>
+                    <option value="9825">9825 - Magic Rhythm</option>
+                    <option value="8852">8852 - Cotton the Seal</option>
+                    <option value="8914">8914 - Forever Rosa</option>
+                    <option value="6073">6073 - Sweet Dreams</option>
+                    <option value="5899">5899 - Swing</option>
+                    <option value="13999">13999 - Wishing Cake</option>
+                    <option value="6205">6205 - Love Chat</option>
+                    <option value="5662">5662 - Necklace</option>
+                    <option value="11809">11809 - Beating Heart</option>
+                    <option value="14002">14002 - Fairy Mask</option>
+                    <option value="13983">13983 - Fortune Kitty</option>
+                    <option value="8750">8750 - Gold Microphone</option>
+                    <option value="8244">8244 - Hands Up</option>
+                    <option value="6415">6415 - Music</option>
+                    <option value="5731">5731 - Coral</option>
+                    <option value="10669">10669 - Future City</option>
+                    <option value="7841">7841 - With You</option>
+                    <option value="8604">8604 - Starfish Bay</option>
+                    <option value="8263">8263 - Yellow Bus</option>
+                    <option value="5627">5627 - Romantic Carriage</option>
+                    <option value="9467">9467 - Lili the Leopard</option>
+                    <option value="14293">14293 - Ramadan Night</option>
+                    <option value="9095">9095 - Birthday Party</option>
+                    <option value="8247">8247 - Happy Party</option>
+                    <option value="6790">6790 - Celebration Time</option>
+                    <option value="10176">10176 - 2nd Anniversary</option>
+                    <option value="6089">6089 - Sports Car</option>
+                    <option value="11599">11599 - Dubai</option>
+                    <option value="8420">8420 - Star Throne</option>
+                    <option value="8104">8104 - Monster Truck</option>
+                    <option value="7764">7764 - Star Throne</option>
+                    <option value="7078">7078 - Match Cup</option>
+                    <option value="8916">8916 - Leon and Lili</option>
+                    <option value="6103">6103 - Yacht</option>
+                    <option value="5803">5803 - Beach House</option>
+                    <option value="13307">13307 - Luxury Yacht</option>
+                    <option value="8417">8417 - Octopus</option>
+                    <option value="6203">6203 - Sunset Speedway</option>
+                    <option value="6149">6149 - Interstellar</option>
+                    <option value="7627">7627 - Falcon</option>
+                    <option value="6271">6271 - Falcon</option>
+                    <option value="6367">6367 - Falcon</option>
+                    <option value="10177">10177 - 3rd Anniversary</option>
+                    <option value="8599">8599 - Convertible Car</option>
+                    <option value="8419">8419 - Red Lightning</option>
+                    <option value="6892">6892 - Race Car</option>
+                    <option value="12678">12678 - Level-up Sparks</option>
+                    <option value="12680">12680 - Level-up Spectacle</option>
+                    <option value="6520">6520 - Camping Night</option>
+                    <option value="14310">14310 - Tidecaller Trident</option>
+                    <option value="13790">13790 - Invincible Hammer</option>
+                    <option value="11586">11586 - Party On&On</option>
+                    <option value="10670">10670 - Future Journey</option>
+                    <option value="8737">8737 - Speedster</option>
+                    <option value="8912">8912 - Rosa Nebula</option>
+                    <option value="9086">9086 - Man V Seagull</option>
+                    <option value="8435">8435 - Pyramids</option>
+                    <option value="8387">8387 - Peacock</option>
+                    <option value="7978">7978 - Leopard</option>
+                    <option value="7598">7598 - Pirate's Ship</option>
+                    <option value="7911">7911 - Mammoth</option>
+                    <option value="5954">5954 - Planet</option>
+                    <option value="9466">9466 - Amusement Park</option>
+                    <option value="14129">14129 - Ramadan Celebration</option>
+                    <option value="14132">14132 - Ramadan Celebration</option>
+                    <option value="10398">10398 - Spark</option>
+                    <option value="7125">7125 - Premium Shuttle</option>
+                    <option value="6833">6833 - Castle Fantasy</option>
+                    <option value="6751">6751 - TikTok Shuttle</option>
+                    <option value="5930">5930 - Rocket</option>
+                    <option value="14311">14311 - Undersea Kingdom</option>
+                    <option value="13791">13791 - Chasing Glory</option>
+                    <option value="7987">7987 - Griffin</option>
+                    <option value="7400">7400 - Adam's Dream</option>
+                    <option value="7319">7319 - Phoenix</option>
+                    <option value="7610">7610 - Dragon Flame</option>
+                    <option value="6625">6625 - Towards the Future</option>
+                    <option value="7311">7311 - Knee Sliding</option>
+                    <option value="6369">6369 - Lion</option>
+                    <option value="12260">12260 - TikTok Houses Glory</option>
+                    <option value="8814">8814 - Superhero Fight</option>
+                    <option value="8602">8602 - Gorilla</option>
+                    <option value="8391">8391 - Sam the Whale</option>
+                    <option value="8456">Zeus</option>
+                    <option value="7823">7823 - Leon and Lion</option>
+                    <option value="8381">8381 - Seal and Whale</option>
+                    <div style="display:none;" id="ghost-anchors"></div>
+                    <option value="7312">7312 - TikTok Universe+</option>
+                    <option value="6039">6039 - TikTok Universe</option>
+                    <option value="8651">8651 - Thunder Falcon</option>
+                    <option value="8582">8582 - TikTok Stars</option>
+                    <option value="9092">9092 - Fire Phoenix</option>
+                    <option value="14312">14312 - Lord Marcellus</option>
+                    <option value="13792">13792 - Julius the Champion</option>
+                    <option value="9427">9427 - Pegasus</option>
+                    <option value="9101">9101 - TikTok Universe</option>
+                    <option value="9072">9072 - TikTok Universe</option>
+                </select>
+        <input type="text" id="cmdInput" placeholder="Código ou Palavra" class="input-dark" style="width: 90px;">
+        <select id="actionSelect" class="select-dark" style="flex:1;">
+          <option value="SPAWN_JOGADOR">Spawn Jogador</option>
+          <option value="SPAWN_DRONE">Drone Alvo</option>
+          <option value="SPAWN_DRONE_GRANDE">Drone Grande</option>
+          <option value="SPAWN_MINAS">Minas x10</option>
+          <option value="SPAWN_BOMBA">Bomba</option>
+          <option value="ESCUDO">Escudo</option>
+          <option value="TEMPO_MAIS20">+20 Segundos</option>
+          <option value="TEMPO_MENOS20">-20 Segundos</option>
+          <option value="FORCAR_ANDAR">Andar (até parar)</option>
+          <option value="FORCAR_CORRER">Correr (até parar)</option>
+                  <option value="FORCAR_PARAR">Parar movimento</option>
+        </select>
+        <span style="font-size: 11px; color: #aaa;">x</span>
+        <input type="number" id="eventRepeatInput" class="input-dark" style="width: 44px; text-align: center;" min="1" max="20" value="1" title="Repetições">
+        <button onclick="addEvent()" class="btn-add">ADD</button>
+      </div>
+    </div>
+
+    <div class="modal-section" style="margin-bottom: 5px;">
+      <div class="modal-section-title">📋 Lista de Comandos Ativos Atualmente</div>
+      <div id="event-list" class="event-list-container"></div>
+    </div>
+
+    <button class="btn-reset" onclick="resetRanking()">RESETAR PLACAR DA LIVE</button>
+    <button onclick="toggleModal()" style="width:100%; margin-top:5px; padding:7px; background:#333; color:white; border:none; cursor:pointer; font-weight: bold; border-radius: 4px; font-size: 11px;">FECHAR JANELA</button>
+  </div>
+</div>
+
+<div id="timerPopupOverlay" class="timerPopupOverlay" onclick="if(event.target===this) closeTimerPopup()">
+  <div class="timerPopupBox">
+    <div class="timerPopupTitle">⏱ Ajustar Tempo</div>
+    <div class="timerPopupSub">Duração da rodada (segundos)</div>
+    <div class="timerPopupControls">
+      <button class="timerStepBtn" onclick="timerPopupStep(-5)">−</button>
+      <input type="number" id="timerPopupInput" class="timerPopupInput" min="10" max="600" value="60">
+      <button class="timerStepBtn" onclick="timerPopupStep(5)">+</button>
+    </div>
+    <div class="timerPopupActions">
+      <button class="timerPopupBtn cancel" onclick="closeTimerPopup()">Cancelar</button>
+      <button class="timerPopupBtn confirm" onclick="confirmTimerPopup()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+const W = 520, H = 844;
+
+// ── SPRITES ───────────────────────────────────────────────────────────────────
+const SPRITES = {
+  jogadorandando:       {file:'assets/jogadorandando.png',       fw:340, fh:736, cols:6, count:36, dur:56},
+  jogadorcorrendo:      {file:'assets/jogadorcorrendo.png',      fw:320, fh:700, cols:6, count:36, dur:50},
+  jogadorparadomorrndo: {file:'assets/jogadorparadomorrndo.png', fw:544, fh:736, cols:6, count:36, dur:50},
+  bonecadecostaevirando:{file:'assets/bonecadecostaevirando.png',fw:318, fh:682, cols:6, count:36, dur:51},
+  guardaparadoeatirando:{file:'assets/guardaparadoeatirando.png',fw:306, fh:678, cols:6, count:36, dur:97},
+  // Novos sprites — sprite sheets reais (dados extraídos dos .json fornecidos)
+  dronegrandeparado:    {file:'assets/dronegrandeparado.png',    fw:426, fh:256, cols:6, count:36, dur:60},
+  dronegrandeatirando:  {file:'assets/dronegrandeatirando.png',  fw:544, fh:490, cols:6, count:36, dur:50},
+  drone:                {file:'assets/drone.png',                fw:432, fh:216, cols:5, count:25, dur:43},
+  mina:                 {file:'assets/mina.png',                 fw:640, fh:640, cols:6, count:36, dur:59},
+  bomba:                {file:'assets/bomba.png',                fw:432, fh:640, cols:6, count:36, dur:54},
+  alvo:                 {file:'assets/alvo.png',                 fw:128, fh:128, cols:1, count:1,  dur:100},
+  fundo:                {file:'assets/fundo.png',                fw:520, fh:844, cols:1, count:1,  dur:100},
+};
+const images = {};
+let loaded = 0;
+function loadImages(cb) {
+  Object.keys(SPRITES).forEach(k => {
+    const img = new Image();
+    img.onload = img.onerror = () => { if (++loaded === Object.keys(SPRITES).length) cb(); };
+    img.src = SPRITES[k].file;
+    images[k] = img;
+  });
+}
+
+function drawSprite(key, frame, x, y, scale, flipX) {
+  const s = SPRITES[key], img = images[key];
+  const dw = s.fw*scale, dh = s.fh*scale;
+  const col = frame % s.cols, row = Math.floor(frame / s.cols);
+  ctx.save();
+  if (!img || !img.complete || img.naturalWidth === 0) {
+    ctx.fillStyle = key.includes('guarda')?'#2ecc71':key.includes('boneca')?'#e91e8c':'#f39c12';
+    ctx.fillRect(x-dw/2, y-dh, dw, dh);
+    ctx.restore(); return;
+  }
+  if (flipX) {
+    ctx.translate(x, y-dh); ctx.scale(-1,1);
+    ctx.drawImage(img, col*s.fw, row*s.fh, s.fw, s.fh, -dw/2, 0, dw, dh);
+  } else {
+    ctx.drawImage(img, col*s.fw, row*s.fh, s.fw, s.fh, x-dw/2, y-dh, dw, dh);
+  }
+  ctx.restore();
+}
+
+// ── BONECA STATE MACHINE ──────────────────────────────────────────────────────
+/*
+  sprite bonecadecostaevirando tem 36 frames (0-35), sem loop.
+  Interpretação:
+    frame 0          = totalmente de COSTAS (início)
+    frames 0 → 35    = vira de costas até de frente (animação completa, 1 passagem)
+    frame 35         = totalmente de FRENTE (fim da animação)
+
+  Para voltar de costas usamos a mesma sprite de trás para frente (35 → 0).
+
+  Estados:
+    'back'          → parado no frame 0, aguarda tempo aleatório
+    'turning_front' → avança frames 0→35 sem loop, cada frame em dur ms
+    'scanning'      → parado no frame 35 (de frente), escaneia
+    'turning_back'  → recua frames 35→0 sem loop
+*/
+
+const BONECA_X = W/2, BONECA_Y = 215, BONECA_SCALE = 0.24;
+const BDUR = SPRITES.bonecadecostaevirando.dur;
+const TURN_DUR = 15;
+
+// ── ÁUDIO DA BONECA ───────────────────────────────────────────────────────────
+const bonecaAudio = new Audio('assets/batatinha-frita-1-2-3.mp3');
+bonecaAudio.loop = false;
+let audioPlaying = false;
+
+const laserAudio = new Audio('assets/laser.mp3');
+laserAudio.loop = true;
+
+
+
+let audioMutado = false;
+
+function tiroAudio(count) {
+  if (audioMutado) return;
+  // toca N sons de tiro (um por jogador na arena)
+  for (let i = 0; i < count; i++) {
+    const a = new Audio('assets/tiro.mp3');
+    a.volume = Math.min(1, 0.7 + i * 0.05);
+    setTimeout(() => a.play().catch(() => {}), i * 80);
+  }
+}
+
+function playBonecaAudio() {
+  if (audioPlaying || audioMutado) return;
+  bonecaAudio.currentTime = 0;
+  bonecaAudio.play().catch(() => {});
+  audioPlaying = true;
+}
+
+function stopBonecaAudio() {
+  bonecaAudio.pause();
+  audioPlaying = false;
+}
+
+const boneca = {
+  state: 'back',
+  frame: 0,
+  frameTimer: 0,
+  stateTimer: 0,
+  backDuration: 0,
+  scanDuration: 0,
+};
+
+function rndBack() { return 2.0 + Math.random() * 2.5; }
+function rndScan() { return 1.5 + Math.random() * 1.5; }
+
+function initBoneca() {
+  boneca.state       = 'back';
+  boneca.frame       = 0;
+  boneca.frameTimer  = 0;
+  boneca.stateTimer  = 0;
+  boneca.backDuration = rndBack();
+  boneca.scanDuration = rndScan();
+}
+
+function updateBoneca(dt) {
+  // ── Bloqueia a boneca de costas enquanto drone grande ou drone simples estiver ativo
+  const eventoAtivo = droneGrande !== null || droneUnitario !== null;
+  if (eventoAtivo) {
+    // força ficar de costas, pausa tudo
+    boneca.state = 'back';
+    boneca.frame = 0;
+    boneca.frameTimer = 0;
+    boneca.stateTimer = 0;
+    stopBonecaAudio();
+    laserAudio.pause(); laserAudio.currentTime = 0;
+    return;
+  }
+
+  boneca.stateTimer += dt;
+
+  switch (boneca.state) {
+
+    case 'back':
+      boneca.frame = 0;
+      // toca áudio uma vez ao entrar no estado back
+      playBonecaAudio();
+      // aguarda o áudio terminar (ou timeout de 10s) e depois 3s antes de virar
+      if (audioPlaying && !bonecaAudio.paused && !bonecaAudio.ended) {
+        // áudio ainda tocando — reset do timer de espera
+        boneca.audioEndedTimer = 0;
+      } else if (!audioPlaying || bonecaAudio.ended || bonecaAudio.paused) {
+        // áudio terminou ou mutado — conta 3 segundos
+        if (boneca.audioEndedTimer === undefined) boneca.audioEndedTimer = 0;
+        boneca.audioEndedTimer += dt;
+        if (boneca.audioEndedTimer >= 3.0) {
+          boneca.audioEndedTimer = 0;
+          audioPlaying = false;
+          boneca.state      = 'turning_front';
+          boneca.stateTimer = 0;
+          boneca.frame      = 0;
+          boneca.frameTimer = 0;
+        }
+      }
+      break;
+
+    case 'turning_front':
+      // avança frame a frame de 0 até 35, sem loop
+      boneca.frameTimer += dt * 1000;
+      while (boneca.frameTimer >= TURN_DUR) {
+        boneca.frameTimer -= TURN_DUR;
+        if (boneca.frame < 35) {
+          boneca.frame++;
+        }
+      }
+      if (boneca.frame >= 35) {
+        boneca.frame      = 35;
+        boneca.state      = 'scanning';
+        boneca.stateTimer = 0;
+        boneca.scanDuration = rndScan();
+        laserAudio.currentTime = 0;
+        if (!audioMutado) laserAudio.play().catch(() => {});
+      }
+      break;
+
+    case 'scanning':
+      boneca.frame = 35;
+      if (boneca.stateTimer >= boneca.scanDuration && !guardsShooting) {
+        boneca.state      = 'turning_back';
+        boneca.stateTimer = 0;
+        boneca.frameTimer = 0;
+        laserAudio.pause();
+        laserAudio.currentTime = 0;
+      }
+      break;
+
+    case 'turning_back':
+      // recua frame a frame de 35 até 0, sem loop
+      boneca.frameTimer += dt * 1000;
+      while (boneca.frameTimer >= TURN_DUR) {
+        boneca.frameTimer -= TURN_DUR;
+        if (boneca.frame > 0) {
+          boneca.frame--;
+        }
+      }
+      if (boneca.frame <= 0) {
+        boneca.frame       = 0;
+        boneca.state       = 'back';
+        boneca.stateTimer  = 0;
+        boneca.backDuration = rndBack();
+        audioPlaying = false; // permite tocar de novo
+      }
+      break;
+  }
+}
+
+// ── GUARDAS ───────────────────────────────────────────────────────────────────
+// Completamente parados (frame 0 fixo).
+// Só atiram quando boneca.state === 'scanning' E jogador se mexeu.
+const GUARD_SCALE = 0.125;
+const FINISH_LINE_Y = 205 + 25; // linha vermelha perto dos pés dos guardas
+const guards = [
+  { x: W/2 - 95, y: 205, side: 'left',  frame: 0, frameTimer: 0, shooting: false },
+  { x: W/2 + 95, y: 205, side: 'right', frame: 0, frameTimer: 0, shooting: false },
+];
+
+const SPAWN_LINE_Y = H - 140; // linha branca — extras spawnam abaixo dela
+const PX0 = W/2, PY0 = H - 60; // jogador nasce abaixo da linha
+let player = null; // jogador principal começa sem spawnar — entra via spawn
+function makePlayer() {
+  return {
+    x:PX0, y:PY0, vx:0, vy:0,
+    speed:20, runSpeed:37,
+    anim:'jogadorandando', frame:0, frameTimer:0,
+    facingLeft:false, moving:false,
+    dead:false, deadTimer:0, deadDone:false,
+    won:false, safe:false,
+    nome:'Você', cor:'#f7c948',
+    shield:false, shieldTimer:0,
+    forceMove:false, walkingOut:false, walkTargetX:0, walkTargetY:0,
+  };
+}
+
+// avança frame de uma entidade (com ou sem loop)
+function advFrame(e, key, dt, loop=true) {
+  const s = SPRITES[key];
+  e.frameTimer += dt * 1000;
+  if (e.frameTimer >= s.dur) {
+    e.frameTimer = 0;
+    if (loop) e.frame = (e.frame + 1) % s.count;
+    else      e.frame = Math.min(e.frame + 1, s.count - 1);
+  }
+}
+
+let bullets = [];
+let score = 0, level = 1;
+let extras = []; // jogadores extras spawnados com tecla 7
+let gameState = 'start', lastTime = 0;
+let detectedMovement = false;
+let timeLeft = 60;
+let guardsShooting = false; // bloqueia morte enquanto guardas animam
+
+// ── NOVOS EVENTOS ─────────────────────────────────────────────────────────────
+// ── NOMES E AVATARES ──────────────────────────────────────────────────────────
+const NOMES = [
+  'Ana','Bruno','Carla','Diego','Elena','Fabio','Gabi','Hugo',
+  'Iris','João','Karen','Lucas','Manu','Neto','Olivia','Pedro',
+  'Queli','Rafael','Sara','Thiago','Uira','Vivi','Wesley','Xena','Yago','Zara'
+];
+const CORES_AVATAR = [
+  '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
+  '#1abc9c','#e67e22','#e91e8c','#00bcd4','#ff5722'
+];
+let nomeIndex = 0;
+let eliminados = []; // fila de cards a exibir
+
+function proximoNome() {
+  const n = NOMES[nomeIndex % NOMES.length];
+  nomeIndex++;
+  return n;
+}
+
+function corAvatar(idx) {
+  return CORES_AVATAR[idx % CORES_AVATAR.length];
+}
+
+// Renderiza avatar genérico num canvas 64x64
+function criarAvatarCanvas(nome, cor) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const cx = c.getContext('2d');
+  // fundo
+  cx.fillStyle = cor;
+  cx.fillRect(0,0,64,64);
+  // inicial
+  cx.fillStyle = '#fff';
+  cx.font = 'bold 26px Arial Black,Arial';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText(nome[0].toUpperCase(), 32, 30);
+  // nome embaixo
+  cx.font = 'bold 9px Arial';
+  cx.fillText(nome.length > 7 ? nome.slice(0,7) : nome, 32, 54);
+  return c;
+}
+
+const MAX_ELIM_CARDS = 5; // limite de cards visíveis pra não poluir a tela
+function adicionarEliminado(nome, cor, avatarUrl) {
+  const panel = document.getElementById('eliminadosPanel');
+  const card = document.createElement('div');
+  card.className = 'elimCard';
+
+  if (avatarUrl) {
+    // tenta mostrar foto real do TikTok
+    const img = document.createElement('img');
+    img.crossOrigin = 'anonymous';
+    img.style.cssText = 'width:64px;height:64px;object-fit:cover;display:block;';
+    img.src = avatarUrl;
+    img.onerror = () => {
+      // fallback: avatar com inicial
+      img.replaceWith(criarAvatarCanvas(nome, cor));
+    };
+    card.appendChild(img);
+  } else {
+    const av = criarAvatarCanvas(nome, cor);
+    card.appendChild(av);
+  }
+
+  // nome embaixo do avatar no card
+  const nameTag = document.createElement('div');
+  nameTag.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.65);color:#fff;font-size:8px;font-weight:bold;text-align:center;padding:2px 1px;line-height:1.1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;';
+  nameTag.textContent = nome.length > 8 ? nome.slice(0,8) : nome;
+  card.appendChild(nameTag);
+
+  const x = document.createElement('div');
+  x.className = 'elimX';
+  x.textContent = '✕';
+  card.appendChild(x);
+  panel.appendChild(card);
+  // depois de 600ms aparece o X
+  setTimeout(() => x.classList.add('show'), 600);
+  // encheu? remove o mais antigo pra abrir espaço pro próximo
+  while (panel.children.length > MAX_ELIM_CARDS) {
+    panel.removeChild(panel.firstChild);
+  }
+}
+
+let ranking = []; // { nome, cor, vitorias }
+let droneGrande = null;    // drone grande na tela
+let droneUnitario = null;  // drone pequeno com alvo
+let minas = [];            // até 10 minas escondidas
+let bombas = [];           // bombas em jogadores aleatórios
+let eventParticles = [];   // partículas de explosão
+
+function resetGame() {
+  if (_restartTimer) { clearInterval(_restartTimer); _restartTimer = null; }
+  document.getElementById('gameOverScreen').style.display = 'none';
+  score = 0; level = 1; timeLeft = initialTime; guardsShooting = false;
+  nomeIndex = 0; eliminados = []; ranking = [];
+  document.getElementById('eliminadosPanel').innerHTML = '';
+  stopBonecaAudio(); audioPlaying = false;
+  laserAudio.pause(); laserAudio.currentTime = 0;
+  player = null; // jogador só entra via spawn
+  bullets = []; extras = [];
+  detectedMovement = false;
+  guards.forEach(g => { g.frame = 0; g.frameTimer = 0; g.shooting = false; });
+  // Reset novos eventos
+  droneGrande = null;
+  droneUnitario = null;
+  minas = [];
+  bombas = [];
+  eventParticles = [];
+  forceMoveTimer = 0;
+  forceMoveRunning = false;
+  initBoneca();
+  updateHUD();
+}
+function updateHUD() {
+  const s = Math.max(0, Math.ceil(timeLeft));
+  const m = Math.floor(s / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  document.getElementById('timerNum').textContent = m + ':' + ss;
+  // vermelho nos últimos 10 segundos
+  document.getElementById('timerNum').style.color = s <= 10 ? '#e74c3c' : '#f7c948';
+}
+
+// ── FUNÇÕES DOS NOVOS EVENTOS ─────────────────────────────────────────────────
+
+function todosJogadores() {
+  const lista = [];
+  if (player && !player.dead) lista.push(player);
+  extras.filter(e => !e.dead).forEach(e => lista.push(e));
+  return lista;
+}
+
+// ── MOVIMENTO ─────────────────────────────────────────────────────────────────
+// Jogadores e extras NÃO colidem entre si — passam uns pelos outros livremente.
+// Só as bordas da tela e o limite "só pra frente" (aplicado em cada bloco de
+// movimento) restringem o deslocamento.
+function moveEntity(entity, dx, dy) {
+  return { x: entity.x + dx, y: entity.y + dy };
+}
+
+// Escolhe o próximo destino do andar/correr forçado: SEMPRE avança mais pra
+// frente do que se desloca pro lado, pra não ficar "andando de lado" parecendo
+// travado (especialmente perto da linha vermelha de chegada).
+function pickForwardTarget(x, y) {
+  const forwardStep  = 70 + Math.random() * 90;   // 70–160px sempre pra frente
+  const lateralDrift = (Math.random() * 100) - 50; // -50 a +50px (bem menor que o avanço)
+  return {
+    tx: Math.max(40, Math.min(W - 40, x + lateralDrift)),
+    ty: y - forwardStep,
+  };
+}
+
+function spawnExplosao(x, y, cor) {
+  for (let i = 0; i < 18; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 60 + Math.random() * 180;
+    eventParticles.push({
+      x, y,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd,
+      life: 0.7 + Math.random() * 0.5,
+      maxLife: 0.7 + Math.random() * 0.5,
+      r: 4 + Math.random() * 6,
+      cor: cor || '#ff6600',
+    });
+  }
+}
+
+// DRONE GRANDE — aparece no topo, para, atira, mata 50% dos jogadores
+function spawnDroneGrande(triggererNome) {
+  if (droneGrande) return;
+  droneGrande = {
+    x: W / 2,
+    y: -120,
+    targetY: 180,
+    state: 'entrando',
+    timer: 0,
+    frame: 0,
+    frameTimer: 0,
+    atirou: false,
+    shotParticles: [],
+    triggererNome: triggererNome || null,
+  };
+}
+
+function updateDroneGrande(dt) {
+  if (!droneGrande) return;
+  const dg = droneGrande;
+  dg.timer += dt;
+
+  if (dg.state === 'entrando') {
+    dg.y += (dg.targetY - dg.y) * Math.min(1, dt * 4);
+    if (Math.abs(dg.y - dg.targetY) < 2) {
+      dg.y = dg.targetY;
+      dg.state = 'parado';
+      dg.timer = 0;
+    }
+  } else if (dg.state === 'parado') {
+    // treme levemente
+    if (dg.timer >= 1.5) {
+      dg.state = 'atirando';
+      dg.timer = 0;
+      dg.frame = 0; dg.frameTimer = 0; // reinicia a animação ao trocar de sprite sheet
+    }
+  } else if (dg.state === 'atirando') {
+    if (!dg.atirou && dg.timer >= 0.6) {
+      dg.atirou = true;
+      // mata 50% dos jogadores aleatoriamente (exclui quem disparou o evento)
+      const todos = todosJogadores().filter(e => !dg.triggererNome || e.nome !== dg.triggererNome);
+      const qtd = Math.ceil(todos.length / 2);
+      const embaralhado = todos.sort(() => Math.random() - 0.5);
+      tiroAudio(qtd);
+      for (let i = 0; i < qtd; i++) {
+        const alvo = embaralhado[i];
+        spawnExplosao(alvo.x, alvo.y - 20, '#ff4400');
+        if (alvo === player) killPlayer();
+        else killExtra(alvo);
+      }
+    }
+    if (dg.timer >= 1.8) {
+      dg.state = 'saindo';
+      dg.timer = 0;
+      dg.frame = 0; dg.frameTimer = 0;
+    }
+  } else if (dg.state === 'saindo') {
+    dg.y -= 280 * dt;
+    if (dg.y < -200) droneGrande = null;
+  }
+
+  // avança a animação sempre com dronegrandeparado (sem erros de sprite)
+  if (droneGrande) {
+    advFrame(dg, 'dronegrandeparado', dt, true);
+  }
+}
+
+function drawDroneGrande() {
+  if (!droneGrande) return;
+  const dg = droneGrande;
+  const scale = 0.35;
+  const spriteKey = 'dronegrandeparado'; // sempre usa esta sprite
+  const s = SPRITES[spriteKey];
+  const img = images[spriteKey];
+  const dw = s.fw * scale, dh = s.fh * scale;
+  // efeito de hover
+  const hover = Math.sin(Date.now() / 300) * 4;
+
+  ctx.save();
+  if (img && img.complete && img.naturalWidth > 0) {
+    const frame = dg.frame % s.count;
+    const col = frame % s.cols, row = Math.floor(frame / s.cols);
+    ctx.drawImage(img, col * s.fw, row * s.fh, s.fw, s.fh, dg.x - dw/2, dg.y - dh/2 + hover, dw, dh);
+  } else {
+    // fallback
+    ctx.fillStyle = '#334';
+    ctx.fillRect(dg.x - 60, dg.y - 30 + hover, 120, 60);
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('DRONE GRANDE', dg.x, dg.y + 5 + hover);
+  }
+
+  // luzes piscando
+  const pulse = Math.sin(Date.now() / 150);
+  ctx.beginPath();
+  ctx.arc(dg.x - 45, dg.y - 10 + hover, 5, 0, Math.PI * 2);
+  ctx.fillStyle = pulse > 0 ? '#ff0000' : '#550000';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(dg.x + 45, dg.y - 10 + hover, 5, 0, Math.PI * 2);
+  ctx.fillStyle = pulse > 0 ? '#00ff00' : '#005500';
+  ctx.fill();
+
+  // raios quando atirando
+  if (dg.state === 'atirando' && dg.timer < 1.0) {
+    const todos = todosJogadores();
+    todos.forEach(alvo => {
+      ctx.save();
+      ctx.strokeStyle = `rgba(255,80,0,${0.7 - dg.timer * 0.5})`;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#ff4400';
+      ctx.beginPath();
+      ctx.moveTo(dg.x, dg.y + 20 + hover);
+      ctx.lineTo(alvo.x, alvo.y - 20);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  ctx.restore();
+}
+
+// DRONE PEQUENO — aparece, escolhe jogador, alvo na cabeça, guardas matam
+function spawnDrone(triggererNome) {
+  if (droneUnitario) return;
+  const vivos = todosJogadores().filter(e => !triggererNome || e.nome !== triggererNome);
+  if (vivos.length === 0) {
+    // se só tem o próprio usuário na arena, pega qualquer um
+    const todos = todosJogadores();
+    if (todos.length === 0) return;
+    vivos.push(...todos);
+  }
+  const alvo = vivos[Math.floor(Math.random() * vivos.length)];
+  droneUnitario = {
+    x: Math.random() > 0.5 ? -80 : W + 80,
+    y: FINISH_LINE_Y + 40 + Math.random() * 100,
+    targetX: alvo.x,
+    alvo: alvo,
+    state: 'entrando',
+    timer: 0,
+    frame: 0,
+    frameTimer: 0,
+    alvoMorreu: false,
+  };
+}
+
+function updateDrone(dt) {
+  if (!droneUnitario) return;
+  const d = droneUnitario;
+  d.timer += dt;
+
+  if (d.state === 'entrando') {
+    d.x += (d.targetX - d.x) * Math.min(1, dt * 3);
+    if (Math.abs(d.x - d.targetX) < 5) {
+      d.state = 'marcando';
+      d.timer = 0;
+    }
+  } else if (d.state === 'marcando') {
+    // acompanha o alvo
+    if (d.alvo && !d.alvo.dead) {
+      d.x = d.alvo.x;
+    }
+    if (d.timer >= 1.8) {
+      // guardas atiram no alvo marcado
+      d.state = 'guardas_atirando';
+      d.timer = 0;
+      guardsShooting = true;
+      guards.forEach(g => { g.shooting = true; g.frame = 0; g.frameTimer = 0; g.shotFired = false; });
+      // marca o alvo como condemned
+      if (d.alvo && !d.alvo.dead) {
+        if (d.alvo === player) {
+          // jogador principal morre
+          d.alvoMorreu = true;
+        } else {
+          d.alvo.condemned = true;
+          d.alvoMorreu = true;
+        }
+      }
+    }
+  } else if (d.state === 'guardas_atirando') {
+    if (!guardsShooting) {
+      d.state = 'saindo';
+      d.timer = 0;
+    }
+  } else if (d.state === 'saindo') {
+    d.x -= 300 * dt;
+    if (d.x < -150 || d.x > W + 150) droneUnitario = null;
+  }
+
+  if (droneUnitario) advFrame(d, 'drone', dt, true);
+}
+
+function drawDrone() {
+  if (!droneUnitario) return;
+  const d = droneUnitario;
+  const scale = 0.18;
+  const s = SPRITES['drone'];
+  const img = images['drone'];
+  const dw = s.fw * scale, dh = s.fh * scale;
+  const hover = Math.sin(Date.now() / 200) * 3;
+
+  ctx.save();
+  if (img && img.complete && img.naturalWidth > 0) {
+    const frame = d.frame % s.count;
+    const col = frame % s.cols, row = Math.floor(frame / s.cols);
+    ctx.drawImage(img, col * s.fw, row * s.fh, s.fw, s.fh, d.x - dw/2, d.y - dh/2 + hover, dw, dh);
+  } else {
+    ctx.fillStyle = '#222';
+    ctx.fillRect(d.x - 20, d.y - 10 + hover, 40, 20);
+    ctx.fillStyle = '#fff';
+    ctx.font = '9px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('DRONE', d.x, d.y + 5 + hover);
+  }
+  ctx.restore();
+
+  // Alvo na cabeça do jogador marcado (estado marcando)
+  if (d.state === 'marcando' && d.alvo && !d.alvo.dead) {
+    const ax = d.alvo.x, ay = d.alvo.y - 55;
+    const sAlvo = SPRITES['alvo'];
+    const imgAlvo = images['alvo'];
+    const as = 0.22;
+    const aw = sAlvo.fw * as, ah = sAlvo.fh * as;
+    const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 120);
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    if (imgAlvo && imgAlvo.complete && imgAlvo.naturalWidth > 0) {
+      ctx.drawImage(imgAlvo, ax - aw/2, ay - ah/2, aw, ah);
+    } else {
+      // fallback: círculo de alvo
+      ctx.strokeStyle = '#ff0000';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(ax, ay, 16, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(ax, ay, 6, 0, Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax-22, ay); ctx.lineTo(ax+22, ay); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax, ay-22); ctx.lineTo(ax, ay+22); ctx.stroke();
+    }
+    ctx.restore();
+
+    // linha do drone ao alvo
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,0,0,${0.3 + 0.2 * Math.sin(Date.now()/100)})`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(d.x, d.y);
+    ctx.lineTo(ax, ay);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// MINAS — 10 minas escondidas na arena, sempre depois (acima) da linha branca,
+// em posições aleatórias e nunca em cima de um jogador que já está parado ali.
+function spawnMinas() {
+  minas = [];
+  const jogadores = todosJogadores();
+  const MIN_DIST_PLAYER = 70;
+  const MIN_Y = FINISH_LINE_Y + 30;   // não muito perto da linha vermelha/bonecos
+  const MAX_Y = SPAWN_LINE_Y - 20;    // não passa da linha branca
+
+  for (let i = 0; i < 10; i++) {
+    let tries = 0, mx, my;
+    do {
+      mx = 40 + Math.random() * (W - 80);
+      my = MIN_Y + Math.random() * (MAX_Y - MIN_Y);
+      tries++;
+    } while (tries < 60 && (
+      minas.some(m => Math.hypot(mx - m.x, my - m.y) < 35) ||
+      jogadores.some(j => Math.hypot(mx - j.x, my - j.y) < MIN_DIST_PLAYER)
+    ));
+    minas.push({ x: mx, y: my, revealed: false, dead: false, timer: 0 });
+  }
+}
+
+function updateMinas(dt) {
+  minas.forEach(m => {
+    if (m.dead) return;
+    if (m.revealed) {
+      m.timer += dt;
+      if (m.timer >= 0.25 && !m.explodiu) {
+        m.explodiu = true;
+        tiroAudio(1);
+        spawnExplosao(m.x, m.y, '#ff8800');
+        // mata quem está em cima
+        todosJogadores().forEach(j => {
+          if (Math.hypot(j.x - m.x, j.y - m.y) < 40) {
+            if (j === player) killPlayer();
+            else killExtra(j);
+          }
+        });
+      }
+      if (m.timer >= 0.8) m.dead = true;
+      return;
+    }
+    // detecta jogadores passando por cima
+    todosJogadores().forEach(j => {
+      if (!m.revealed && Math.hypot(j.x - m.x, j.y - m.y) < 24) {
+        m.revealed = true;
+        m.timer = 0;
+      }
+    });
+  });
+  minas = minas.filter(m => !m.dead);
+}
+
+function drawMinas() {
+  minas.forEach(m => {
+    const scale = 0.07; // sheet tem frames de 640x640px
+    const s = SPRITES['mina'];
+    const img = images['mina'];
+    const dw = s.fw * scale, dh = s.fh * scale;
+    ctx.save();
+
+    if (!m.revealed) {
+      ctx.restore();
+      return;
+    }
+
+    if (img && img.complete && img.naturalWidth > 0) {
+      // mapeia o ciclo de vida da mina (revelada → explode em 0.25s → some em 0.8s)
+      // para os 36 frames reais da sprite sheet (idle → explosão → fumaça)
+      const progress = Math.min(1, m.timer / 0.8);
+      const frame = Math.min(s.count - 1, Math.floor(progress * s.count));
+      const col = frame % s.cols, row = Math.floor(frame / s.cols);
+      if (!m.explodiu) {
+        ctx.globalAlpha = 0.7 + 0.3 * Math.sin(Date.now() / 80); // pisca antes de explodir
+      }
+      ctx.drawImage(img, col * s.fw, row * s.fh, s.fw, s.fh, m.x - dw/2, m.y - dh/2, dw, dh);
+    } else if (!m.explodiu) {
+      const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 80);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = '#ff8800';
+      ctx.beginPath(); ctx.arc(m.x, m.y, 12, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 9px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('!', m.x, m.y);
+    } else {
+      ctx.globalAlpha = 1 - m.timer * 3;
+      ctx.fillStyle = '#ff8800';
+      ctx.beginPath(); ctx.arc(m.x, m.y, 30 + m.timer * 80, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  });
+}
+
+// BOMBA — coloca sprite da bomba nas costas do jogador por 3s, depois explode e mata
+function spawnBomba(triggererNome) {
+  let vivos = todosJogadores().filter(e => !triggererNome || e.nome !== triggererNome);
+  if (vivos.length === 0) vivos = todosJogadores(); // fallback se só tem o próprio
+  if (vivos.length === 0) return;
+  const alvo = vivos[Math.floor(Math.random() * vivos.length)];
+  bombas.push({ alvo: alvo, timer: 0, explodiu: false });
+}
+
+function updateBombas(dt) {
+  bombas.forEach(b => {
+    if (b.explodiu) return;
+    b.timer += dt;
+    if (b.timer >= 5.0) {
+      b.explodiu = true;
+      tiroAudio(1);
+      spawnExplosao(b.alvo.x, b.alvo.y - 30, '#ff0044');
+      if (b.alvo === player) killPlayer();
+      else killExtra(b.alvo);
+    }
+  });
+  bombas = bombas.filter(b => !b.explodiu);
+}
+
+function drawBombas() {
+  const img = images['bomba'];
+  // bomba.png é imagem única 432x640 — conteúdo ocupa ~60% central
+  // queremos ~38px de largura nas costas do jogador => 38/432 ≈ 0.088
+  const SCALE = 0.088;
+  const dw = 432 * SCALE; // ~38px
+  const dh = 640 * SCALE; // ~56px
+
+  bombas.forEach(b => {
+    if (b.explodiu) return;
+    const alvo = b.alvo;
+    if (!alvo || alvo.dead) return;
+
+    // pisca no último 1s
+    const piscando = b.timer > 4.0;
+    const alpha = piscando ? 0.35 + 0.65 * Math.abs(Math.sin(Date.now() / 100)) : 1;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // costas do jogador: lado oposto ao que ele está olhando
+    // jogador olha para direita → costas à esquerda (offX negativo) e vice-versa
+    const bx = alvo.x + 2;
+    const by = alvo.y - 40;
+
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, bx - dw/2, by - dh/2, dw, dh);
+    } else {
+      ctx.fillStyle = '#e74c3c';
+      ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 9px Arial';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('💣', bx, by);
+    }
+
+    ctx.restore();
+
+    // contador de segundos sobre a bomba
+    ctx.save();
+    const secsLeft = Math.ceil(5.0 - b.timer);
+    ctx.font = 'bold 13px Arial Black,Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#ff2200';
+    ctx.shadowBlur = 6; ctx.shadowColor = '#000';
+    ctx.fillText(secsLeft + 's', bx, by - dh/2 - 2);
+    ctx.restore();
+  });
+}
+
+// ── ESCUDO — protege um jogador aleatório de uma morte ───────────────────────
+function giveShield() {
+  const candidatos = todosJogadores().filter(e => !e.shield);
+  if (candidatos.length === 0) return;
+  const alvo = candidatos[Math.floor(Math.random() * candidatos.length)];
+  alvo.shield = true;
+  alvo.shieldTimer = 12; // expira sozinho após 12s se não for usado
+  spawnExplosao(alvo.x, alvo.y - 40, '#22ccff');
+}
+
+function updateShields(dt) {
+  if (player && player.shield) {
+    player.shieldTimer -= dt;
+    if (player.shieldTimer <= 0) { player.shield = false; player.shieldTimer = 0; }
+  }
+  extras.forEach(e => {
+    if (e.shield) {
+      e.shieldTimer -= dt;
+      if (e.shieldTimer <= 0) { e.shield = false; e.shieldTimer = 0; }
+    }
+  });
+}
+
+function drawShields() {
+  todosJogadores().forEach(e => {
+    if (!e.shield) return;
+    const pulse = 0.6 + 0.4 * Math.sin(Date.now() / 150);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(e.x, e.y - 42, 32, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(0,200,255,${pulse})`;
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = '#00c8ff';
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// ── AJUSTE DE TEMPO (+20s / -20s) ────────────────────────────────────────────
+function adjustTime(sec) {
+  if (gameState !== 'playing') return;
+  timeLeft = Math.max(0, Math.min(300, timeLeft + sec));
+  updateHUD();
+  const fl = document.getElementById('damageFlash');
+  fl.style.background = sec > 0 ? 'rgba(46,204,113,0.35)' : 'rgba(231,76,60,0.35)';
+  setTimeout(() => fl.style.background = 'rgba(231,76,60,0)', 220);
+}
+// AVATARES NA CABEÇA DOS JOGADORES
+const _avatarCache = new Map();    // key → canvas (letra) ou Image (foto)
+const _avatarImgCache = new Map(); // avatarUrl → HTMLImageElement (carregando ou pronta)
+
+function getAvatarImg(nome, cor) {
+  const key = nome + cor;
+  if (_avatarCache.has(key)) return _avatarCache.get(key);
+  // desenha avatar redondo num OffscreenCanvas (ou canvas normal)
+  const size = 64;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const cx = c.getContext('2d');
+  // círculo de fundo
+  cx.beginPath();
+  cx.arc(size/2, size/2, size/2, 0, Math.PI*2);
+  cx.fillStyle = cor;
+  cx.fill();
+  // borda branca
+  cx.strokeStyle = 'rgba(255,255,255,0.85)';
+  cx.lineWidth = 3;
+  cx.stroke();
+  // inicial
+  cx.fillStyle = '#fff';
+  cx.font = 'bold 26px Arial Black,Arial';
+  cx.textAlign = 'center';
+  cx.textBaseline = 'middle';
+  cx.fillText(nome[0].toUpperCase(), size/2, size/2 + 1);
+  _avatarCache.set(key, c);
+  return c;
+}
+
+function getOrLoadAvatarPhoto(avatarUrl) {
+  if (_avatarImgCache.has(avatarUrl)) return _avatarImgCache.get(avatarUrl);
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = avatarUrl;
+  _avatarImgCache.set(avatarUrl, img);
+  return img;
+}
+
+function drawNomes() {
+  function drawAvatar(e) {
+    if (e.dead) return;
+    const nome = e.nome || 'Você';
+    const cor  = e.cor  || '#f7c948';
+    const R    = 18; // raio do avatar no canvas do jogo
+    const cx   = e.x;
+    const cy   = e.y - 82; // posição da cabeça
+
+    ctx.save();
+    // clip circular
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI*2);
+    ctx.clip();
+
+    if (e.avatarUrl) {
+      // tenta usar a foto real do seguidor
+      const photo = getOrLoadAvatarPhoto(e.avatarUrl);
+      if (photo.complete && photo.naturalWidth > 0) {
+        ctx.drawImage(photo, cx - R, cy - R, R*2, R*2);
+      } else {
+        // ainda carregando: mostra avatar com inicial enquanto isso
+        const av = getAvatarImg(nome, cor);
+        ctx.drawImage(av, cx - R, cy - R, R*2, R*2);
+      }
+    } else {
+      const av = getAvatarImg(nome, cor);
+      ctx.drawImage(av, cx - R, cy - R, R*2, R*2);
+    }
+    ctx.restore();
+
+    // anel externo
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI*2);
+    ctx.strokeStyle = e === player ? '#f7c948' : 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.stroke();
+    ctx.restore();
+  }
+  extras.forEach(drawAvatar);
+  if (player) drawAvatar(player);
+}
+
+// ── BALÕES DE FALA DO CHAT ───────────────────────────────────────────────────
+// Cada entrada: { user, text, timer, maxTimer }
+// Associamos ao extra cujo nome === user (ou ao player se for "Você")
+let chatBubbles = []; // [{ user, text, timer }]
+const BUBBLE_DURATION = 4.0; // segundos que o balão fica visível
+
+function addChatBubble(user, text) {
+  // limita o texto a 40 chars para não explodir o balão
+  const msg = text.length > 40 ? text.slice(0, 38) + '…' : text;
+  // substitui se o mesmo user já tem balão (atualiza)
+  const existing = chatBubbles.find(b => b.user === user);
+  if (existing) {
+    existing.text = msg;
+    existing.timer = BUBBLE_DURATION;
+  } else {
+    chatBubbles.push({ user, text: msg, timer: BUBBLE_DURATION });
+  }
+}
+
+function updateChatBubbles(dt) {
+  chatBubbles.forEach(b => b.timer -= dt);
+  chatBubbles = chatBubbles.filter(b => b.timer > 0);
+}
+
+function drawChatBubbles() {
+  // Para cada balão, acha o jogador correspondente e desenha sobre ele
+  chatBubbles.forEach(b => {
+    // acha entidade com esse nome
+    let entity = null;
+    if (player && (player.nome === b.user || b.user === 'Você')) entity = player;
+    else entity = extras.find(e => e.nome === b.user) || null;
+    if (!entity || entity.dead) return;
+
+    const alpha = Math.min(1, b.timer / 0.4); // fade out nos últimos 0.4s
+    const ex = entity.x;
+    const ey = entity.y - 104; // acima do avatar (avatar está em y-82, raio 18)
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // — medição do texto —
+    const PADDING_X = 8, PADDING_Y = 5;
+    const MAX_W = 130;
+    const LINE_H = 13;
+    ctx.font = 'bold 10px Arial';
+
+    // quebra em linhas
+    const words = b.text.split(' ');
+    const lines = [];
+    let cur = '';
+    words.forEach(w => {
+      const test = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(test).width > MAX_W - PADDING_X*2) {
+        if (cur) lines.push(cur);
+        cur = w;
+      } else {
+        cur = test;
+      }
+    });
+    if (cur) lines.push(cur);
+
+    const bw = Math.min(MAX_W, Math.max(...lines.map(l => ctx.measureText(l).width)) + PADDING_X * 2);
+    const bh = lines.length * LINE_H + PADDING_Y * 2;
+    const bx = ex - bw / 2;
+    const by = ey - bh;
+    const br = 8; // border-radius
+
+    // — fundo branco arredondado —
+    ctx.beginPath();
+    ctx.moveTo(bx + br, by);
+    ctx.lineTo(bx + bw - br, by);
+    ctx.arcTo(bx + bw, by, bx + bw, by + br, br);
+    ctx.lineTo(bx + bw, by + bh - br);
+    ctx.arcTo(bx + bw, by + bh, bx + bw - br, by + bh, br);
+    // cauda do balão (triângulo apontando pra baixo centralizado)
+    ctx.lineTo(ex + 6, by + bh);
+    ctx.lineTo(ex, by + bh + 7);
+    ctx.lineTo(ex - 6, by + bh);
+    ctx.lineTo(bx + br, by + bh);
+    ctx.arcTo(bx, by + bh, bx, by + bh - br, br);
+    ctx.lineTo(bx, by + br);
+    ctx.arcTo(bx, by, bx + br, by, br);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // borda sutil
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // — nome do usuário em vermelho —
+    ctx.font = 'bold 8px Arial Black,Arial';
+    ctx.fillStyle = '#e74c3c';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    // (não mostramos o nome separado, fica implícito pelo balão sair do personagem)
+
+    // — texto —
+    ctx.font = 'bold 10px Arial';
+    ctx.fillStyle = '#111';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    lines.forEach((line, i) => {
+      ctx.fillText(line, bx + PADDING_X, by + PADDING_Y + i * LINE_H);
+    });
+
+    ctx.restore();
+  });
+}
+function updateParticles(dt) {
+  eventParticles.forEach(p => {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 150 * dt;
+    p.life -= dt;
+  });
+  eventParticles = eventParticles.filter(p => p.life > 0);
+}
+
+function drawParticles() {
+  eventParticles.forEach(p => {
+    const alpha = p.life / p.maxLife;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.cor;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = p.cor;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * alpha, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ── UPDATE ────────────────────────────────────────────────────────────────────
+function update(dt) {
+  updateBoneca(dt);
+
+  // animação de morte do jogador principal
+  if (player && player.dead) {
+    advFrame(player, 'jogadorparadomorrndo', dt, false);
+    if (!player.deadDone && player.frame >= SPRITES.jogadorparadomorrndo.count - 1) {
+      player.deadDone = true;
+      // animação concluída: transfere para deadPlayers (só renderização) e libera o slot
+      if (!window.deadPlayers) window.deadPlayers = [];
+      window.deadPlayers.push({ ...player });
+      const extrasVivos = extras.filter(e => !e.dead).length;
+      if (extrasVivos === 0) {
+        if (!player.gameOverShown) {
+          player.gameOverShown = true;
+          gameState = 'dead';
+          mostrarTodosEliminados();
+        }
+      }
+      player = null; // libera slot para respawn
+    }
+  }
+
+  // animação de morte dos extras
+  extras.forEach(e => {
+    if (e.dead && !e.deadDone) {
+      advFrame(e, 'jogadorparadomorrndo', dt, false);
+      if (e.frame >= SPRITES.jogadorparadomorrndo.count - 1) e.deadDone = true;
+    }
+  });
+
+  // sem player e sem extras vivos → game over
+  if (!player && extras.every(e => e.dead) && extras.length > 0 && !guardsShooting && gameState === 'playing') {
+    gameState = 'dead';
+    mostrarTodosEliminados();
+  }
+
+  if (player && player.won) return;
+
+  // Se não há player e todos os extras morreram (fora do guardsShooting) → todos eliminados
+  if (!player && extras.length > 0 && extras.every(e => e.dead) && !guardsShooting && gameState === 'playing') {
+    gameState = 'dead';
+    mostrarTodosEliminados();
+  }
+
+  // Movimento jogador (só se vivo)
+  if (player && !player.dead && !player.safe) {
+    // forceMove no player — anda/corre até o target ignorando joystick
+    if (player.forceMove && player.forceMoveTimer > 0) {
+      const dx = player.walkTargetX - player.x, dy = player.walkTargetY - player.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 8) {
+        // chegou — escolhe novo destino sempre mais pra frente que pro lado
+        const t = pickForwardTarget(player.x, player.y);
+        player.walkTargetX = t.tx;
+        player.walkTargetY = t.ty;
+      } else {
+        const spd = player.forceMoveRunning ? player.runSpeed : player.speed;
+        player.vx = (dx / dist) * spd;
+        player.vy = Math.min(0, (dy / dist) * spd); // nunca recua
+        player.facingLeft = player.vx < 0;
+        player.anim = player.forceMoveRunning ? 'jogadorcorrendo' : 'jogadorandando';
+        player.moving = true;
+        const moved = moveEntity(player, player.vx * dt, player.vy * dt);
+        player.x = Math.max(18, Math.min(W-18, moved.x));
+        player.y = Math.max(80, Math.min(H-30, moved.y));
+        advFrame(player, player.anim, dt);
+      }
+    } else {
+      if (player.forceMove) { player.forceMove = false; player.walkingOut = false; }
+
+      // Direção bruta do clique/toque — mas SÓ permite ir para frente (dy negativo = subir).
+      // Se o jogador clicar atrás de si (dy > 0), bloqueia o eixo Y e só permite movimento lateral.
+      let rawDx = joy.dx;
+      let rawDy = joy.dy;
+      if (rawDy > 0) rawDy = 0; // nunca volta para trás
+
+      // Se após bloquear dy o vetor ficou muito pequeno, considera parado
+      const isMoving  = Math.hypot(rawDx, rawDy) > 0.05;
+      const isRunning = running && isMoving;
+      const spd       = isRunning ? player.runSpeed : player.speed;
+      player.moving   = isMoving;
+
+      if (isMoving) {
+        // Normaliza o vetor resultante para manter a velocidade constante
+        const len = Math.hypot(rawDx, rawDy);
+        player.vx = (rawDx / len) * spd;
+        player.vy = (rawDy / len) * spd * 0.55;
+        player.facingLeft = rawDx < 0;
+        player.anim = isRunning ? 'jogadorcorrendo' : 'jogadorandando';
+      } else {
+        player.vx = 0; player.vy = 0;
+        player.frame = 0;
+        player.frameTimer = 0;
+      }
+
+      const moved = moveEntity(player, player.vx * dt, player.vy * dt);
+      player.x = Math.max(18, Math.min(W-18, moved.x));
+      // vy negativo = indo pra frente (subindo na tela): aceita moved.y livremente
+      // vy positivo = tentando voltar pra trás: bloqueia
+      if (player.vy <= 0) {
+        // indo pra frente: permite cruzar a linha vermelha de verdade (safe detection cuida do resto)
+        player.y = Math.max(80, Math.min(H - 30, moved.y));
+      } else {
+        // tentando voltar: bloqueia
+        player.y = Math.min(H - 30, Math.max(player.y, moved.y));
+      }
+      if (isMoving) advFrame(player, player.anim, dt);
+    }
+  }
+
+  // Movimento dos extras: só via forceMove (FORCAR_ANDAR / FORCAR_CORRER)
+  // Extras NÃO andam sozinhos — ficam parados até receber comando
+  extras.forEach(e => {
+    if (e.dead || e.safe) return;
+    if (e.walkingOut && e.forceMove) {
+      const dx = e.walkTargetX - e.x, dy = e.walkTargetY - e.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 6) {
+        // forceMove: escolhe novo destino sempre mais pra frente que pro lado
+        const t = pickForwardTarget(e.x, e.y);
+        e.walkTargetX = t.tx;
+        e.walkTargetY = t.ty;
+      } else {
+        const spd = e.forceMoveRunning ? 37 : 19;
+        const normDist = dist || 1;
+        e.vx = (dx / normDist) * spd;
+        e.vy = Math.min(0, (dy / normDist) * spd); // nunca volta pra trás
+        e.facingLeft = e.vx < 0;
+        const moved = moveEntity(e, e.vx * dt, e.vy * dt);
+        e.x = Math.max(18, Math.min(W - 18, moved.x));
+        e.y = Math.min(e.y, moved.y); // nunca aumenta Y
+        e.moving = true;
+        e.anim = e.forceMoveRunning ? 'jogadorcorrendo' : 'jogadorandando';
+        advFrame(e, e.anim, dt);
+      }
+    } else if (!e.forceMove) {
+      // sem forceMove: para o extra
+      e.walkingOut = false;
+      e.moving = false;
+    }
+  });
+
+  // Detecção de movimento durante scan — qualquer jogador que se mover morre
+  if (boneca.state === 'scanning') {
+    const jogadores = todosJogadores();
+    jogadores.forEach(e => {
+      if (e.dead || e.safe || e.condemned) return;
+      if (e.moving) {
+        // para o jogador na hora (congela)
+        e.vx = 0; e.vy = 0; e.moving = false;
+        e.frame = 0; e.frameTimer = 0;
+        e.condemned = true;
+        if (e === player) detectedMovement = true;
+      }
+    });
+    if (detectedMovement || extras.some(e => e.condemned)) {
+      if (!guardsShooting) {
+        guardsShooting = true;
+        guards.forEach(g => { g.shooting = true; g.frame = 0; g.frameTimer = 0; });
+        laserAudio.pause(); laserAudio.currentTime = 0;
+      }
+    }
+  } else if (!droneGrande && !droneUnitario) {
+    detectedMovement = false;
+    extras.forEach(e => { if (!e.dead) e.condemned = false; });
+  }
+
+  // Avança animação dos guardas que estão atirando
+  if (guardsShooting) {
+    let allDone = true;
+    const halfFrame = Math.floor(SPRITES.guardaparadoeatirando.count / 2);
+    guards.forEach(g => {
+      if (g.shooting) {
+        advFrame(g, 'guardaparadoeatirando', dt, false);
+        if (g.frame >= SPRITES.guardaparadoeatirando.count - 1) {
+          g.shooting = false;
+        } else {
+          allDone = false;
+        }
+        if (g.frame >= halfFrame && !g.shotFired) {
+          g.shotFired = true;
+          // conta quantos serão eliminados para calibrar os tiros
+          let eliminadosCount = 0;
+          if (player && !player.dead && !player.safe && (detectedMovement || (droneUnitario && droneUnitario.alvo === player && droneUnitario.alvoMorreu))) eliminadosCount++;
+          extras.forEach(e => { if (e.condemned && !e.dead && !e.safe) eliminadosCount++; });
+          extras.forEach(e => { if (!e.dead && !e.safe && timeLeft <= 0) eliminadosCount++; });
+          if (eliminadosCount === 0) eliminadosCount = 1;
+          tiroAudio(eliminadosCount);
+          // Se o drone pequeno marcou o jogador principal, mata ele
+          const droneAlvouPlayer = droneUnitario && droneUnitario.alvo === player && droneUnitario.alvoMorreu;
+          // Mata o jogador principal se se moveu OU foi alvo do drone
+          if (player && !player.dead && !player.safe && (detectedMovement || droneAlvouPlayer)) killPlayer();
+          extras.forEach(e => { if (e.condemned && !e.dead && !e.safe) killExtra(e); });
+          extras.forEach(e => { if (!e.dead && !e.safe && timeLeft <= 0) killExtra(e); });
+        }
+      }
+    });
+    if (allDone) {
+      guardsShooting = false;
+      guards.forEach(g => { g.shotFired = false; });
+      // Verifica se todos foram eliminados após o tiro dos guardas
+      const algumVivo = (player && !player.dead) || extras.some(e => !e.dead);
+      if (!algumVivo && gameState === 'playing') {
+        gameState = 'dead';
+        mostrarTodosEliminados();
+      }
+    }
+  }
+
+  // Balas
+  bullets.forEach(b => {
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    if (player && !player.dead && Math.hypot(b.x - player.x, b.y - (player.y - 30)) < 22) {
+      b.dead = true;
+      killPlayer();
+    }
+  });
+  bullets = bullets.filter(b => !b.dead && b.x > -80 && b.x < W+80 && b.y > -80 && b.y < H+80);
+
+  // Extras sem walkingOut ficam parados (frame 0) — exceto se em forceMove
+  extras.forEach(e => {
+    if (!e.dead && !e.walkingOut && !e.forceMove) { e.moving = false; e.frame = 0; e.frameTimer = 0; }
+  });
+
+  // Verifica cruzamento da linha vermelha — jogador/extras voltam ao início com ponto
+  // .y é a posição dos pés do personagem, então a vitória é exatamente na linha vermelha
+  if (player && !player.dead && !player.safe && player.y <= FINISH_LINE_Y) {
+    registrarVitoria(player);
+    player.safe = true;
+    player.moving = false; player.vx = 0; player.vy = 0;
+    setTimeout(() => {
+      player.x = PX0; player.y = PY0;
+      player.vx = 0; player.vy = 0;
+      player.safe = false; player.moving = false;
+    }, 600);
+  }
+  extras.forEach(e => {
+    if (!e.dead && !e.safe && e.y <= FINISH_LINE_Y) {
+      registrarVitoria(e);
+      e.safe = true;
+      e.moving = false; e.vx = 0; e.vy = 0;
+      setTimeout(() => {
+        e.x = 60 + Math.random() * (W - 120);
+        e.y = SPAWN_LINE_Y + 10 + Math.random() * 50;
+        e.vx = 0; e.vy = 0;
+        e.safe = false; e.moving = false;
+        e.idleTimer = 0; e.walkingOut = false;
+      }, 600);
+    }
+  });
+
+  // Cronômetro — continua mesmo se jogador morreu
+  if (!guardsShooting && gameState === 'playing') timeLeft -= dt;
+  if (timeLeft <= 0 && !guardsShooting) {
+    timeLeft = 0;
+    const temAlvoVivo = (player && !player.dead && !player.safe) ||
+                        extras.some(e => !e.dead && !e.safe);
+    if (temAlvoVivo) {
+      guardsShooting = true;
+      guards.forEach(g => { g.shooting = true; g.frame = 0; g.frameTimer = 0; });
+      detectedMovement = true;
+      laserAudio.pause(); laserAudio.currentTime = 0;
+    }
+  }
+  // Atualiza novos eventos
+  updateDroneGrande(dt);
+  updateDrone(dt);
+  updateMinas(dt);
+  updateBombas(dt);
+  updateParticles(dt);
+  updateShields(dt);
+  updateForceMove(dt);
+  updateChatBubbles(dt);
+
+  updateHUD();
+}
+
+function spawnBullet(fx, fy) {
+  if (!player) return;
+  const tx = player.x, ty = player.y - 30;
+  const dx = tx-fx, dy = ty-fy, len = Math.hypot(dx, dy) || 1;
+  bullets.push({x:fx, y:fy, vx:dx/len*(320+level*15), vy:dy/len*(320+level*15), dead:false});
+}
+
+function killPlayer() {
+  if (!player || player.dead) return;
+  if (player.shield) {
+    player.shield = false; player.shieldTimer = 0;
+    spawnExplosao(player.x, player.y - 40, '#22ccff');
+    return;
+  }
+  player.dead = true; player.deadTimer = 0; player.deadDone = false;
+  player.anim = 'jogadorparadomorrndo'; player.frame = 0; player.frameTimer = 0;
+  player.vx = 0; player.vy = 0;
+  const fl = document.getElementById('damageFlash');
+  fl.style.background = 'rgba(231,76,60,0.65)';
+  setTimeout(() => fl.style.background = 'rgba(231,76,60,0)', 220);
+}
+
+function killExtra(e) {
+  if (e.dead) return;
+  if (e.shield) {
+    e.shield = false; e.shieldTimer = 0;
+    spawnExplosao(e.x, e.y - 40, '#22ccff');
+    return;
+  }
+  e.dead = true; e.deadTimer = 0; e.deadDone = false;
+  e.anim = 'jogadorparadomorrndo'; e.frame = 0; e.frameTimer = 0;
+  e.vx = 0; e.vy = 0;
+  advFrame(e, 'jogadorparadomorrndo', 0.016, false);
+  if (e.nome) adicionarEliminado(e.nome, e.cor || '#555', e.avatarUrl || null);
+}
+
+// ── RANKING ───────────────────────────────────────────────────────────────────
+function registrarVitoria(e) {
+  const nome = e.nome || 'Você';
+  const cor  = e.cor  || '#f7c948';
+  const entry = ranking.find(r => r.nome === nome);
+  if (entry) { entry.vitorias++; if (e.avatarUrl) entry.avatarUrl = e.avatarUrl; }
+  else ranking.push({ nome, cor, vitorias: 1, avatarUrl: e.avatarUrl || null });
+  // ordena por vitórias desc
+  ranking.sort((a, b) => b.vitorias - a.vitorias);
+  if (typeof updateRankingPanel === 'function') updateRankingPanel();
+
+  // balão de fala + notificação de vitória, com o avatar do jogador
+  addChatBubble(nome, '🏆 Eu venci a arena!');
+  showEventNotif(nome, e.avatarUrl || null, 'VITORIA');
+}
+
+function drawRanking() {
+  const rx = W - 8;   // lado direito
+  const ry = 8;      // mesma altura do timer
+  const rowH = 22;
+  const maxRows = 5; // painel fixo — sempre mostra top 5, mesmo vazio
+
+  const boxW = 148;
+  const boxH = 14 + maxRows * rowH + 6;
+
+  ctx.save();
+
+  // fundo
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, rx - boxW, ry, boxW, boxH, 8);
+  ctx.fill(); ctx.stroke();
+
+  // título
+  ctx.font = 'bold 9px Arial Black,Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#f7c948';
+  ctx.shadowBlur = 6; ctx.shadowColor = '#f39c12';
+  ctx.fillText('🏆 VENCEDORES', rx - boxW/2, ry + 4);
+  ctx.shadowBlur = 0;
+
+  // linhas — sempre desenha 5, usando placeholder quando ainda não há vencedor naquela posição
+  for (let i = 0; i < maxRows; i++) {
+    const r = ranking[i];
+    const y = ry + 18 + i * rowH;
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+
+    // highlight do 1º lugar (só quando já tem alguém ali)
+    if (i === 0 && r) {
+      ctx.fillStyle = 'rgba(247,201,72,0.12)';
+      ctx.fillRect(rx - boxW + 2, y - 2, boxW - 4, rowH - 2);
+    }
+
+    if (!r) {
+      // vaga vazia — placeholder discreto
+      ctx.beginPath();
+      ctx.arc(rx - boxW + 14, y + 8, 6, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fill();
+
+      ctx.font = '9px Arial';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      const label = (typeof medal === 'string' && medal.length > 2 ? medal : medal + ' ') + '---';
+      ctx.fillText(label, rx - boxW + 24, y + 8);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = '10px Arial';
+      ctx.fillText('0✓', rx - 6, y + 8);
+      continue;
+    }
+
+    // bolinha cor do jogador
+    ctx.beginPath();
+    ctx.arc(rx - boxW + 14, y + 8, 6, 0, Math.PI*2);
+    ctx.fillStyle = r.cor;
+    ctx.fill();
+
+    // inicial
+    ctx.font = 'bold 7px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(r.nome[0].toUpperCase(), rx - boxW + 14, y + 8);
+
+    // posição + nome
+    ctx.font = i === 0 ? 'bold 10px Arial Black,Arial' : '9px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = i === 0 ? '#f7c948' : '#ddd';
+    const nomeDisplay = r.nome.length > 8 ? r.nome.slice(0,8) : r.nome;
+    ctx.fillText((typeof medal === 'string' && medal.length > 2 ? medal : medal + ' ') + nomeDisplay, rx - boxW + 24, y + 8);
+
+    // vitórias
+    ctx.textAlign = 'right';
+    ctx.fillStyle = i === 0 ? '#f7c948' : '#aaa';
+    ctx.font = 'bold 10px Arial Black,Arial';
+    ctx.fillText(r.vitorias + '✓', rx - 6, y + 8);
+  }
+
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+  ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+  ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
+  ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r);
+  ctx.closePath();
+}
+
+// ── DRAW ──────────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Fundo — imagem da arena
+  const fundoImg = images['fundo'];
+  if (fundoImg && fundoImg.complete && fundoImg.naturalWidth > 0) {
+    ctx.drawImage(fundoImg, 0, 0, W, H);
+  } else {
+    // fallback enquanto a imagem carrega
+    const bg = ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,    '#6bb3d6');
+    bg.addColorStop(0.40, '#a8d8ea');
+    bg.addColorStop(0.40, '#6aaa3a');
+    bg.addColorStop(0.65, '#4a8c28');
+    bg.addColorStop(1,    '#2d5a14');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#7ec850'; ctx.fillRect(0, H*0.40, W, 5);
+  }
+
+  // Linha vermelha de chegada (perto dos pés dos guardas)
+  ctx.save();
+  ctx.strokeStyle = '#e74c3c';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(0, FINISH_LINE_Y);
+  ctx.lineTo(W, FINISH_LINE_Y);
+  ctx.stroke();
+  ctx.restore();
+
+  // Linha branca de spawn
+  ctx.save();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([18, 10]);
+  ctx.beginPath();
+  ctx.moveTo(0, SPAWN_LINE_Y);
+  ctx.lineTo(W, SPAWN_LINE_Y);
+  ctx.stroke();
+  ctx.restore();
+
+
+
+  // Sombras
+  shadowE(BONECA_X, BONECA_Y+3, 26);
+  guards.forEach(g => shadowE(g.x, g.y+2, 16));
+  if (player) shadowE(player.x, player.y+2, 18);
+  extras.forEach(e => shadowE(e.x, e.y+2, 18));
+
+  // Boneca — frame controlado pelo state machine, SEM loop
+  drawSprite('bonecadecostaevirando', boneca.frame, BONECA_X, BONECA_Y, BONECA_SCALE, false);
+
+  // Laser da boneca — só no estado scanning
+  if (boneca.state === 'scanning') {
+    const eyeX = BONECA_X;
+    const eyeY = BONECA_Y - SPRITES.bonecadecostaevirando.fh * BONECA_SCALE * 0.82;
+    const laserLen = H;
+    const spread = 1.1; // leque mais aberto
+    const steps = 30;
+    const t = Date.now() / 800;
+
+    ctx.save();
+
+    // gradiente de fundo do leque (preenchimento suave)
+    const leftA  = Math.PI/2 - spread/2;
+    const rightA = Math.PI/2 + spread/2;
+    const grad = ctx.createRadialGradient(eyeX, eyeY, 0, eyeX, eyeY, laserLen * 0.7);
+    grad.addColorStop(0,   'rgba(255,0,0,0.18)');
+    grad.addColorStop(0.4, 'rgba(255,0,0,0.07)');
+    grad.addColorStop(1,   'rgba(255,0,0,0)');
+    ctx.beginPath();
+    ctx.moveTo(eyeX, eyeY);
+    ctx.lineTo(eyeX + Math.cos(leftA)  * laserLen, eyeY + Math.sin(leftA)  * laserLen);
+    ctx.lineTo(eyeX + Math.cos(rightA) * laserLen, eyeY + Math.sin(rightA) * laserLen);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // linhas do leque pulsantes
+    for (let i = 0; i < steps; i++) {
+      const a = leftA + (spread / (steps - 1)) * i;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2 + i * 0.4);
+      const alpha = 0.06 + 0.08 * pulse;
+      const width = 1 + pulse * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(eyeX, eyeY);
+      ctx.lineTo(eyeX + Math.cos(a) * laserLen, eyeY + Math.sin(a) * laserLen);
+      ctx.strokeStyle = `rgba(255,${Math.floor(40 * pulse)},0,${alpha})`;
+      ctx.lineWidth = width;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = 'rgba(255,0,0,0.6)';
+      ctx.stroke();
+    }
+
+    // bordas do leque mais brilhantes
+    [leftA, rightA].forEach(a => {
+      ctx.beginPath();
+      ctx.moveTo(eyeX, eyeY);
+      ctx.lineTo(eyeX + Math.cos(a) * laserLen * 0.85, eyeY + Math.sin(a) * laserLen * 0.85);
+      ctx.strokeStyle = 'rgba(255,60,0,0.35)';
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = 'red';
+      ctx.stroke();
+    });
+
+    // ponto brilhante no olho
+    ctx.beginPath();
+    ctx.arc(eyeX, eyeY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,80,80,0.9)';
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = 'red';
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // Guardas — animam ao atirar
+  guards.forEach(g => {
+    drawSprite('guardaparadoeatirando', g.frame, g.x, g.y, GUARD_SCALE, g.side === 'right');
+  });
+
+
+  // Jogador
+  const PLAYER_SCALES = {
+    jogadorandando:       0.13,
+    jogadorcorrendo:      0.13,
+    jogadorparadomorrndo: 0.19,
+  };
+
+  // Extras
+  extras.forEach(e => {
+    const sc = PLAYER_SCALES[e.anim] || 0.13;
+    drawSprite(e.anim, e.frame, e.x, e.y, sc, e.facingLeft);
+  });
+
+  // Corpos de jogadores que terminaram animação de morte (só visual)
+  if (window.deadPlayers) {
+    window.deadPlayers.forEach(dp => {
+      const sc = PLAYER_SCALES['jogadorparadomorrndo'] || 0.13;
+      drawSprite('jogadorparadomorrndo', SPRITES.jogadorparadomorrndo.count - 1, dp.x, dp.y, sc, dp.facingLeft);
+    });
+  }
+
+  // Jogador principal — sempre desenhado, morto fica no último frame
+  if (player) {
+    const sc = PLAYER_SCALES[player.anim] || 0.13;
+    drawSprite(player.anim, player.frame, player.x, player.y, sc, player.facingLeft);
+  }
+
+  // Nomes dos jogadores
+  drawNomes();
+
+  // Balões de fala do chat
+  drawChatBubbles();
+
+  // Escudos ativos
+  drawShields();
+
+  // Partículas de explosão
+  drawParticles();
+
+  // Minas (visíveis para ajuste — opacidade reduzida quando escondidas)
+  drawMinas();
+
+  // Bombas
+  drawBombas();
+
+  // Drone pequeno e alvo
+  drawDrone();
+
+  // Drone grande
+  drawDroneGrande();
+
+  // Ranking
+  drawRanking();
+
+  // CHEGOU
+  if (player && player.won) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(W/2-120, H/2-30, 240, 58);
+    ctx.fillStyle = '#f7c948';
+    ctx.font = 'bold 30px Arial Black,Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 14; ctx.shadowColor = '#f39c12';
+    ctx.fillText('CHEGOU! +500', W/2, H/2);
+    ctx.restore();
+  }
+}
+
+function shadowE(x, y, rx) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(x, y, rx, rx*0.35, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawTree(x, baseY) {
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.strokeStyle = '#5c3317'; ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.moveTo(x, baseY+130); ctx.lineTo(x, baseY+20); ctx.stroke();
+  [[x,baseY+75,x-50,baseY+32],[x,baseY+60,x+55,baseY+22],
+   [x,baseY+95,x-35,baseY+68],[x,baseY+85,x+38,baseY+62],
+   [x,baseY+40,x-22,baseY+8],[x,baseY+32,x+28,baseY+6]
+  ].forEach(([x1,y1,x2,y2]) => {
+    ctx.lineWidth = 5; ctx.strokeStyle = '#4a2a12';
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  });
+  ctx.restore();
+}
+
+// ── LOOP ──────────────────────────────────────────────────────────────────────
+function loop(ts) {
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+  if (gameState === 'playing') { applyKeyboard(); update(dt); draw(); }
+  else if (gameState === 'dead') { draw(); }
+  else if (gameState === 'start') { draw(); } // mantém canvas vivo na tela inicial
+  requestAnimationFrame(loop);
+}
+
+// ── CONTROLES: CLIQUE/TOQUE MOVE, TECLA 1 CORRE ──────────────────────────────
+const joy = {dx:0, dy:0};
+let running = false;
+let pressing = false; // está com botão/toque pressionado
+
+// Calcula direção do jogador até o ponto clicado/tocado
+function setJoyFromPoint(cx, cy) {
+  if (!player || player.dead) { joy.dx = 0; joy.dy = 0; return; }
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  const tx = (cx - rect.left) * scaleX;
+  const ty = (cy - rect.top)  * scaleY;
+  const dx = tx - player.x;
+  const dy = ty - player.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 8) { joy.dx = 0; joy.dy = 0; return; }
+  joy.dx = dx / len;
+  joy.dy = dy / len;
+}
+
+// Mouse
+canvas.addEventListener('mousedown', e => { pressing = true; setJoyFromPoint(e.clientX, e.clientY); });
+canvas.addEventListener('mousemove', e => { if (pressing) setJoyFromPoint(e.clientX, e.clientY); });
+window.addEventListener('mouseup', () => { pressing = false; joy.dx = 0; joy.dy = 0; });
+
+// Touch
+canvas.addEventListener('touchstart', e => { e.preventDefault(); pressing = true; const t = e.touches[0]; setJoyFromPoint(t.clientX, t.clientY); }, {passive:false});
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); const t = e.touches[0]; setJoyFromPoint(t.clientX, t.clientY); }, {passive:false});
+canvas.addEventListener('touchend',   e => { e.preventDefault(); pressing = false; joy.dx = 0; joy.dy = 0; }, {passive:false});
+
+// Tecla 1 = correr
+const keys = {};
+function spawnJogadorExtra(nomeCustom, avatarUrl) {
+  if (gameState !== 'playing') return;
+  // Impede duplicata: se já existe jogador vivo com o mesmo nome, ignora
+  if (nomeCustom) {
+    const jaExiste =
+      (player && !player.dead && player.nome === nomeCustom) ||
+      extras.some(e => !e.dead && e.nome === nomeCustom);
+    if (jaExiste) return;
+  }
+  // Se o jogador principal ainda não foi spawnado, cria ele primeiro
+  if (!player) {
+    let nx, ny, tries = 0;
+    do {
+      nx = 60 + Math.random() * (W - 120);
+      ny = SPAWN_LINE_Y + 10 + Math.random() * 50;
+      tries++;
+    } while (tries < 30 && extras.some(e2 => Math.hypot(nx - e2.x, ny - e2.y) < 48));
+    player = makePlayer();
+    player.x = nx; player.y = ny;
+    if (nomeCustom) player.nome = nomeCustom;
+    if (avatarUrl) player.avatarUrl = avatarUrl;
+    return;
+  }
+  const MIN_DIST = 48;
+  if (extras.filter(e => !e.dead).length >= (player.dead ? 40 : 39)) return;
+  let tries = 0, nx, ny;
+  do {
+    nx = 60 + Math.random() * (W - 120);
+    ny = SPAWN_LINE_Y + 10 + Math.random() * 50;
+    tries++;
+  } while (tries < 30 && (
+    Math.hypot(nx - player.x, ny - player.y) < MIN_DIST ||
+    extras.some(e2 => Math.hypot(nx - e2.x, ny - e2.y) < MIN_DIST)
+  ));
+  if (tries < 30) {
+    const idx = extras.length;
+    extras.push({
+      x: nx, y: ny,
+      vx: 0, vy: 0,
+      frame: 0, frameTimer: 0,
+      anim: 'jogadorandando',
+      facingLeft: Math.random() > 0.5,
+      dead: false, deadTimer: 0, deadDone: false,
+      moving: false, condemned: false,
+      idleTimer: 0, walkingOut: false, walkTargetX: 0, walkTargetY: 0,
+      nome: nomeCustom || proximoNome(),
+      cor: corAvatar(idx),
+      avatarUrl: avatarUrl || null,
+      shield: false, shieldTimer: 0,
+    });
+  }
+}
+
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === '1') running = true;
+  if (e.key === '7' && gameState === 'playing') spawnJogadorExtra();
+  if (e.key === '8' && gameState === 'playing') spawnDrone();
+  if (e.key === '9' && gameState === 'playing') spawnDroneGrande();
+  if (e.key === '6' && gameState === 'playing') spawnBomba();
+  if (e.key === '5' && gameState === 'playing') spawnMinas();
+  if ((e.key === 'e' || e.key === 'E') && gameState === 'playing') giveShield();
+  if ((e.key === '+' || e.key === '=') && gameState === 'playing') adjustTime(20);
+  if (e.key === '-' && gameState === 'playing') adjustTime(-20);
+});
+window.addEventListener('keyup',   e => { keys[e.key] = false; if (e.key === '1') running = false; });
+
+function applyKeyboard() {
+  // sem efeito adicional — controle é pelo clique/toque e tecla 1
+}
+
+document.getElementById('btnStart').addEventListener('click',()=>{
+  document.getElementById('startScreen').style.display='none';
+  resetGame(); gameState='playing'; lastTime=performance.now();
+});
+
+// ── TODOS ELIMINADOS — reinício da rodada ─────────────────────────────────────
+let _restartTimer = null;
+function mostrarTodosEliminados() {
+  const screen = document.getElementById('gameOverScreen');
+  const title  = document.getElementById('gameOverTitle');
+  const cd     = document.getElementById('restartCountdown');
+  title.textContent = 'TODOS ELIMINADOS!';
+  screen.style.display = 'flex';
+  let secs = 5;
+  cd.textContent = `Nova rodada em ${secs}s…`;
+  if (_restartTimer) clearInterval(_restartTimer);
+  _restartTimer = setInterval(() => {
+    secs--;
+    if (secs <= 0) {
+      clearInterval(_restartTimer);
+      _restartTimer = null;
+      screen.style.display = 'none';
+      reiniciarRodada();
+    } else {
+      cd.textContent = `Nova rodada em ${secs}s…`;
+    }
+  }, 1000);
+}
+
+function reiniciarRodada() {
+  // Só reseta o timer e limpa corpos — jogadores voltam a spawnar normalmente
+  timeLeft = initialTime;
+  guardsShooting = false;
+  detectedMovement = false;
+  bullets = [];
+  droneGrande = null;
+  droneUnitario = null;
+  minas = [];
+  bombas = [];
+  eventParticles = [];
+  forceMoveTimer = 0;
+  forceMoveRunning = false;
+  chatBubbles = [];
+  // Limpa todos os mortos da tela
+  extras = extras.filter(e => !e.dead);
+  if (player && player.dead) player = null;
+  window.deadPlayers = []; // limpa corpos da tela
+  // Reseta estado de mortos sobreviventes
+  extras.forEach(e => {
+    e.condemned = false;
+    e.walkingOut = false;
+    e.idleTimer = 0;
+  });
+  // Limpa cards de eliminados
+  document.getElementById('eliminadosPanel').innerHTML = '';
+  stopBonecaAudio(); audioPlaying = false;
+  laserAudio.pause(); laserAudio.currentTime = 0;
+  guards.forEach(g => { g.frame = 0; g.frameTimer = 0; g.shooting = false; g.shotFired = false; });
+  initBoneca();
+  updateHUD();
+  gameState = 'playing';
+  lastTime = performance.now();
+}
+
+// ── LIMPAR JOGADORES MORTOS ───────────────────────────────────────────────────
+function limparMortos() {
+  extras = extras.filter(e => !e.dead);
+  if (player && player.dead) player = null;
+  window.deadPlayers = [];
+  // Se o jogo estava travado em 'dead' mas ainda há extras vivos, retoma
+  if (gameState === 'dead') {
+    const temVivos = extras.filter(e => !e.dead).length > 0 || (player && !player.dead);
+    if (temVivos) {
+      if (_restartTimer) { clearInterval(_restartTimer); _restartTimer = null; }
+      document.getElementById('gameOverScreen').style.display = 'none';
+      gameState = 'playing';
+      lastTime = performance.now();
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ── PAINEL TIKTOK LIVE — MAPEAMENTO DE EVENTOS, CONEXÃO TIKFINITY ───────────
+// ════════════════════════════════════════════════════════════════════════════
+
+let eventMappings = JSON.parse(localStorage.getItem('squid_events')) || {
+  "membro": "SPAWN_JOGADOR",
+  "compartilhar": "SPAWN_JOGADOR",
+  "curtida_like": "TEMPO_MAIS20",
+  "5655": "ESCUDO",
+  "rose": "ESCUDO"
+};
+let eventRepeatCounts = JSON.parse(localStorage.getItem('squid_event_repeats')) || {};
+let likeThreshold = parseInt(localStorage.getItem('squid_like_threshold')) || 20;
+let likeCounter = 0;
+let likeCooldown = false;
+
+document.getElementById('likeThresholdInput').value = likeThreshold;
+if (eventMappings["curtida_like"]) document.getElementById('likeActionSelect').value = eventMappings["curtida_like"];
+if (eventMappings["membro"]) document.getElementById('memberActionSelect').value = eventMappings["membro"];
+if (eventRepeatCounts["membro"]) document.getElementById('memberRepeatInput').value = eventRepeatCounts["membro"];
+if (eventMappings["compartilhar"]) document.getElementById('shareActionSelect').value = eventMappings["compartilhar"];
+if (eventRepeatCounts["compartilhar"]) document.getElementById('shareRepeatInput').value = eventRepeatCounts["compartilhar"];
+
+function toggleAudio() {
+  audioMutado = !audioMutado;
+  const btn = document.getElementById('btn-audio');
+  if (audioMutado) {
+    btn.innerHTML = "🔇 ÁUDIO: MUTADO";
+    btn.style.color = "#e74c3c";
+    laserAudio.pause();
+  } else {
+    btn.innerHTML = "🔊 ÁUDIO: LIGADO";
+    btn.style.color = "#fff";
+  }
+}
+
+function playerSelfSpawn() {
+  const n = document.getElementById('player-name-input').value.trim();
+  if (n && gameState === 'playing') spawnJogadorExtra(n, null);
+}
+
+function toggleModal() {
+  const m = document.getElementById('configModal');
+  m.style.display = (m.style.display === 'block') ? 'none' : 'block';
+  renderEvents();
+}
+
+function syncGiftInput() {
+  const sel = document.getElementById('giftSelector').value;
+  if (sel && sel !== "CUSTOM") document.getElementById('cmdInput').value = sel;
+  else if (sel === "CUSTOM") document.getElementById('cmdInput').value = "";
+}
+
+function saveLikeConfig() {
+  likeThreshold = parseInt(document.getElementById('likeThresholdInput').value) || 20;
+  localStorage.setItem('squid_like_threshold', likeThreshold);
+  eventMappings["curtida_like"] = document.getElementById('likeActionSelect').value;
+  localStorage.setItem('squid_events', JSON.stringify(eventMappings));
+  renderEvents();
+}
+
+function saveMemberConfig() {
+  const act = document.getElementById('memberActionSelect').value;
+  const rep = parseInt(document.getElementById('memberRepeatInput').value) || 1;
+  eventMappings["membro"] = act;
+  eventRepeatCounts["membro"] = rep;
+  localStorage.setItem('squid_events', JSON.stringify(eventMappings));
+  localStorage.setItem('squid_event_repeats', JSON.stringify(eventRepeatCounts));
+  renderEvents();
+}
+
+function saveShareConfig() {
+  const act = document.getElementById('shareActionSelect').value;
+  const rep = parseInt(document.getElementById('shareRepeatInput').value) || 1;
+  eventMappings["compartilhar"] = act;
+  eventRepeatCounts["compartilhar"] = rep;
+  localStorage.setItem('squid_events', JSON.stringify(eventMappings));
+  localStorage.setItem('squid_event_repeats', JSON.stringify(eventRepeatCounts));
+  renderEvents();
+}
+
+function addEvent() {
+  const cmd = document.getElementById('cmdInput').value.trim().toLowerCase();
+  const act = document.getElementById('actionSelect').value;
+  const rep = parseInt(document.getElementById('eventRepeatInput').value) || 1;
+  if (cmd) {
+    eventMappings[cmd] = act;
+    eventRepeatCounts[cmd] = rep;
+    localStorage.setItem('squid_events', JSON.stringify(eventMappings));
+    localStorage.setItem('squid_event_repeats', JSON.stringify(eventRepeatCounts));
+    renderEvents();
+  }
+}
+
+function removeEvent(cmd) {
+  delete eventMappings[cmd];
+  delete eventRepeatCounts[cmd];
+  localStorage.setItem('squid_events', JSON.stringify(eventMappings));
+  localStorage.setItem('squid_event_repeats', JSON.stringify(eventRepeatCounts));
+  renderEvents();
+}
+
+const ACTION_LABELS = {
+  SPAWN_JOGADOR: "Spawn Jogador",
+  SPAWN_DRONE: "Drone Alvo",
+  SPAWN_DRONE_GRANDE: "Drone Grande",
+  SPAWN_MINAS: "Minas x10",
+  SPAWN_BOMBA: "Bomba",
+  ESCUDO: "Escudo",
+  TEMPO_MAIS20: "+20 Segundos",
+  TEMPO_MENOS20: "-20 Segundos",
+  FORCAR_ANDAR: "Andar (até parar)",
+  FORCAR_CORRER: "Correr (até parar)",
+  FORCAR_PARAR: "Parar movimento",
+};
+
+function renderEvents() {
+  document.getElementById('event-list').innerHTML = Object.entries(eventMappings).map(([cmd, act]) => {
+    const rep = eventRepeatCounts[cmd] || 1;
+    const repLabel = rep > 1 ? ` <span style="color:#f7c948;font-weight:bold;">x${rep}</span>` : '';
+    return `
+      <div class="event-item">
+        <span><strong>${cmd}</strong> &rarr; ${ACTION_LABELS[act] || act}${repLabel}</span>
+        <div class="event-actions-group">
+          <button class="btn-test" onclick="testTrigger('${cmd}')">Testar</button>
+          <button class="btn-del" onclick="removeEvent('${cmd}')">&times;</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── FORÇAR ANDAR / CORRER / PARAR ───────────────────────────────────────────
+const FORCE_MOVE_DURATION = 999999; // dura até FORCAR_PARAR ser acionado
+let forceMoveTimer = 0;      // segundos restantes
+let forceMoveRunning = false; // false = andar, true = correr
+
+// Para o movimento de uma entidade já encontrada (usado por forcarParar e pelo toggle)
+function pararMovimentoEntidade(alvo) {
+  alvo.forceMoveTimer = 0;
+  alvo.forceMove      = false;
+  alvo.walkingOut     = false;
+  alvo.vx = 0; alvo.vy = 0;
+  alvo.moving         = false;
+  alvo.frame          = 0;
+  alvo.frameTimer     = 0;
+  alvo.idleTimer      = 0;
+}
+
+// Comando simplificado (toggle):
+// 1º acionamento → começa a andar/correr (e revive o jogador se estiver morto/eliminado)
+// 2º acionamento (mesmo modo) → para de se mover
+// Retorna 'andando' | 'correndo' | 'parou' | null (não fez nada)
+function forcarMovimento(correr, nomeUsuario, avatarUrl) {
+  if (gameState !== 'playing') return null;
+
+  // Encontra apenas o jogador que disparou a ação (por nome), entre os vivos
+  let alvo = null;
+  if (player && !player.dead && !player.safe && player.nome === nomeUsuario) {
+    alvo = player;
+  } else {
+    alvo = extras.find(e => !e.dead && !e.safe && e.nome === nomeUsuario) || null;
+  }
+
+  // Jogador morto (ou que ainda nem entrou na partida) → faz ele VOLTAR ao jogo
+  if (!alvo) {
+    spawnJogadorExtra(nomeUsuario, avatarUrl);
+    if (player && !player.dead && player.nome === nomeUsuario) {
+      alvo = player;
+    } else {
+      alvo = extras.find(e => !e.dead && e.nome === nomeUsuario) || null;
+    }
+    if (!alvo) return null; // não foi possível criar (ex: arena cheia)
+  }
+
+  // Toggle: se já está se movendo no MESMO modo (andando/correndo), aciona de novo = parar
+  if (alvo.forceMove && alvo.forceMoveRunning === correr) {
+    pararMovimentoEntidade(alvo);
+    return 'parou';
+  }
+
+  // Timer e modo são por entidade — usamos campos individuais
+  alvo.forceMoveTimer   = FORCE_MOVE_DURATION;
+  alvo.forceMoveRunning = correr;
+
+  const t0 = pickForwardTarget(alvo.x, alvo.y);
+  const tx = t0.tx, ty = t0.ty;
+
+  alvo.walkingOut   = true;
+  alvo.walkTargetX  = tx;
+  alvo.walkTargetY  = ty;
+  alvo.forceMove    = true;
+  alvo.idleTimer    = 0;
+  alvo.condemned    = false;
+
+  return correr ? 'correndo' : 'andando';
+}
+
+function forcarParar(nomeUsuario) {
+  if (gameState !== 'playing') return;
+
+  let alvo = null;
+  if (player && !player.dead && !player.safe && player.nome === nomeUsuario) {
+    alvo = player;
+  } else {
+    alvo = extras.find(e => !e.dead && !e.safe && e.nome === nomeUsuario) || null;
+  }
+  if (!alvo) return;
+
+  pararMovimentoEntidade(alvo);
+}
+
+function updateForceMove(dt) {
+  // Processa timer individual de cada entidade
+  const todos = [
+    ...(player && !player.dead ? [player] : []),
+    ...extras
+  ];
+  todos.forEach(e => {
+    if (!e.forceMove || e.forceMoveTimer === undefined || e.forceMoveTimer <= 0) return;
+    e.forceMoveTimer -= dt;
+    if (e.forceMoveTimer <= 0) {
+      e.forceMoveTimer = 0;
+      e.forceMove      = false;
+      e.walkingOut     = false;
+      e.vx = 0; e.vy = 0;
+      e.moving         = false;
+      e.idleTimer      = 0;
+    }
+  });
+}
+
+function executeAction(action, user, avatar, repeat) {
+  const times = repeat || 1;
+  for (let i = 0; i < times; i++) {
+    if (action === "SPAWN_JOGADOR") {
+      spawnJogadorExtra(user, avatar);
+    } else if (action === "SPAWN_DRONE") {
+      spawnDrone(user);
+      showEventNotif(user, avatar, 'SPAWN_DRONE');
+    } else if (action === "SPAWN_DRONE_GRANDE") {
+      spawnDroneGrande(user);
+      showEventNotif(user, avatar, 'SPAWN_DRONE_GRANDE');
+    } else if (action === "SPAWN_MINAS") {
+      spawnMinas();
+      showEventNotif(user, avatar, 'SPAWN_MINAS');
+    } else if (action === "SPAWN_BOMBA") {
+      // pega nome da vítima antes de spawnar
+      const vivos = todosJogadores().filter(e => !user || e.nome !== user);
+      const vitima = (vivos.length > 0 ? vivos : todosJogadores())[Math.floor(Math.random() * Math.max(1,(vivos.length > 0 ? vivos : todosJogadores()).length))];
+      spawnBomba(user);
+      showEventNotif(user, avatar, 'SPAWN_BOMBA', vitima ? vitima.nome : null);
+    } else if (action === "ESCUDO") {
+      giveShield();
+      showEventNotif(user, avatar, 'ESCUDO');
+    } else if (action === "TEMPO_MAIS20") {
+      adjustTime(20);
+      showEventNotif(user, avatar, 'TEMPO_MAIS20');
+    } else if (action === "TEMPO_MENOS20") {
+      adjustTime(-20);
+      showEventNotif(user, avatar, 'TEMPO_MENOS20');
+    } else if (action === "FORCAR_ANDAR") {
+      const resultadoMov = forcarMovimento(false, user, avatar);
+      if (resultadoMov === 'parou') showEventNotif(user, avatar, 'FORCAR_PARAR');
+      else if (resultadoMov === 'andando') showEventNotif(user, avatar, 'FORCAR_ANDAR');
+    } else if (action === "FORCAR_CORRER") {
+      const resultadoMov = forcarMovimento(true, user, avatar);
+      if (resultadoMov === 'parou') showEventNotif(user, avatar, 'FORCAR_PARAR');
+      else if (resultadoMov === 'correndo') showEventNotif(user, avatar, 'FORCAR_CORRER');
+    } else if (action === "FORCAR_PARAR") {
+      forcarParar(user);
+      showEventNotif(user, avatar, 'FORCAR_PARAR');
+    }
+  }
+}
+
+function testTrigger(key) {
+  const action = eventMappings[key];
+  if (!action) return;
+  const rep = eventRepeatCounts[key] || 1;
+  let testUser = "TESTE_LIVE";
+  if (key === "curtida_like") testUser = "LIKES_TEST";
+  if (key === "membro") testUser = "MEMBRO_TEST";
+  if (key === "compartilhar") testUser = "SHARE_TEST";
+
+  // Se for ação de movimento e não houver jogadores, spawna alguns pra testar
+  if ((action === "FORCAR_ANDAR" || action === "FORCAR_CORRER") && gameState === 'playing') {
+    const vivos = todosJogadores();
+    if (vivos.length === 0) {
+      // spawna 3 jogadores de teste
+      for (let i = 0; i < 3; i++) spawnJogadorExtra("TESTE_" + (i+1), null);
+    }
+  }
+
+  executeAction(action, testUser, null, rep);
+}
+
+// ── VOLTA TELA INICIAL ───────────────────────────────────────────────────────
+function voltarTelaInicial() {
+  if (_restartTimer) { clearInterval(_restartTimer); _restartTimer = null; }
+  gameState = 'start';
+  document.getElementById('startScreen').style.display = 'flex';
+  document.getElementById('gameOverScreen').style.display = 'none';
+  resetGame();
+}
+
+// ── NOTIFICAÇÕES DE EVENTOS ──────────────────────────────────────────────────
+function showEventNotif(user, avatarUrl, action, targetName) {
+  const panel = document.getElementById('eventNotifPanel');
+  if (!panel) return;
+
+  const msgs = {
+    'SPAWN_DRONE':        (u) => `<b>${u}</b> enviou um <b style="color:#3498db;">drone rastreador</b>`,
+    'SPAWN_DRONE_GRANDE': (u) => `<b>${u}</b> enviou um <b style="color:#e74c3c;">drone de combate</b>`,
+    'SPAWN_MINAS':        (u) => `<b>${u}</b> espalhou <b style="color:#e67e22;">minas</b> na arena`,
+    'SPAWN_BOMBA':        (u, t) => `<b>${u}</b> sabotou <b style="color:#e74c3c;">${t || 'alguém'}</b> 💣`,
+    'SPAWN_JOGADOR':      null, // sem notificação pra spawn
+    'ESCUDO':             (u) => `<b>${u}</b> ativou um <b style="color:#2ecc71;">escudo</b>`,
+    'TEMPO_MAIS20':       (u) => `<b>${u}</b> adicionou <b style="color:#2ecc71;">+20s</b> ao tempo`,
+    'TEMPO_MENOS20':      (u) => `<b>${u}</b> removeu <b style="color:#e74c3c;">-20s</b> do tempo`,
+    'FORCAR_ANDAR':       (u) => `<b>${u}</b> está <b style="color:#f7c948;">andando</b>`,
+    'FORCAR_CORRER':      (u) => `<b>${u}</b> está <b style="color:#e67e22;">correndo</b>`,
+    'FORCAR_PARAR':       (u) => `<b>${u}</b> <b style="color:#aaa;">parou</b> de se mover`,
+    'VITORIA':            (u) => `<b>${u}</b> <b style="color:#2ecc71;">venceu a arena!</b> 🏆`,
+  };
+
+  const fn = msgs[action];
+  if (!fn) return;
+
+  const text = fn(user, targetName);
+
+  const div = document.createElement('div');
+  div.className = 'evNotif';
+
+  // avatar
+  if (avatarUrl) {
+    const img = document.createElement('img');
+    img.className = 'evAvatar';
+    img.src = avatarUrl;
+    img.onerror = () => { img.replaceWith(makeNotifAvatar(user)); };
+    div.appendChild(img);
+  } else {
+    div.appendChild(makeNotifAvatar(user));
+  }
+
+  const span = document.createElement('div');
+  span.className = 'evText';
+  span.innerHTML = text;
+  div.appendChild(span);
+
+  panel.appendChild(div);
+
+  // limita a 4 notificações visíveis
+  while (panel.children.length > 4) panel.removeChild(panel.firstChild);
+
+  // remove após 4s com fade
+  setTimeout(() => {
+    div.style.transition = 'opacity 0.5s';
+    div.style.opacity = '0';
+    setTimeout(() => { if (div.parentNode) div.parentNode.removeChild(div); }, 500);
+  }, 4000);
+}
+
+function makeNotifAvatar(nome) {
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  c.className = 'evAvatar';
+  c.style.borderRadius = '50%';
+  const cx = c.getContext('2d');
+  const cor = CORES_AVATAR[Math.abs(nome.charCodeAt(0) || 0) % CORES_AVATAR.length];
+  cx.fillStyle = cor;
+  cx.fillRect(0,0,32,32);
+  cx.fillStyle = '#fff';
+  cx.font = 'bold 14px Arial Black,Arial';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText((nome[0] || '?').toUpperCase(), 16, 16);
+  return c;
+}
+
+// ── CONFIGURAÇÃO DO CRONÔMETRO ───────────────────────────────────────────────
+let initialTime = 60;
+
+function openTimerPopup() {
+  document.getElementById('timerPopupInput').value = initialTime;
+  document.getElementById('timerPopupOverlay').classList.add('open');
+}
+
+function closeTimerPopup() {
+  document.getElementById('timerPopupOverlay').classList.remove('open');
+}
+
+function timerPopupStep(delta) {
+  const input = document.getElementById('timerPopupInput');
+  let val = parseInt(input.value) || 60;
+  val = Math.min(600, Math.max(10, val + delta));
+  input.value = val;
+}
+
+function confirmTimerPopup() {
+  const val = parseInt(document.getElementById('timerPopupInput').value);
+  if (!isNaN(val) && val >= 10 && val <= 600) {
+    initialTime = val;
+    const input = document.getElementById('timerInitInput');
+    if (input) input.value = val;
+    closeTimerPopup();
+  } else {
+    alert('Digite um valor entre 10 e 600 segundos.');
+  }
+}
+
+function saveTimerConfig() {
+  const val = parseInt(document.getElementById('timerInitInput').value);
+  if (!isNaN(val) && val >= 10 && val <= 600) {
+    initialTime = val;
+    const msg = document.getElementById('timerSavedMsg');
+    msg.style.display = 'inline';
+    setTimeout(() => msg.style.display = 'none', 2000);
+  }
+}
+
+function resetRanking() {
+  if (confirm("Deseja zerar o ranking de chegadas da live?")) {
+    ranking = [];
+    updateRankingPanel();
+  }
+}
+
+function updateRankingPanel() {
+  // ranking panel removido
+}
+
+function connectTikFinity() {
+  const socket = new WebSocket('ws://localhost:21213/');
+  socket.onopen = () => { document.getElementById('connDot').classList.add('online'); };
+  socket.onmessage = (event) => {
+    const res = JSON.parse(event.data);
+    const d = res.data || res;
+    if (!d) return;
+
+    let user = d.nickname || d.uniqueId || "Jogador";
+    let avatar = d.profilePictureUrl || d.profilePicUrl || d.avatar || null;
+
+    const ev = (res.event || "").toLowerCase();
+
+    if (ev === "gift") {
+      const giftId = String(d.giftId || "");
+      const giftName = String(d.giftName || "").toLowerCase().trim();
+      if (eventMappings[giftId]) { executeAction(eventMappings[giftId], user, avatar, eventRepeatCounts[giftId] || 1); }
+      else if (eventMappings[giftName]) { executeAction(eventMappings[giftName], user, avatar, eventRepeatCounts[giftName] || 1); }
+      return;
+    }
+
+    let triggerKey = "";
+    let count = 1;
+
+    if (ev === "chat") triggerKey = (d.comment || "").toLowerCase().trim();
+    else if (ev === "command") triggerKey = (d.command || "").toLowerCase();
+    else if (ev === "share") triggerKey = "compartilhar";
+    else if (ev === "member" || ev === "membro" || ev === "subscribe") triggerKey = "membro";
+    else if (ev === "like") {
+      triggerKey = "curtida_like";
+      count = parseInt(d.likeCount) || 1;
+    }
+    else triggerKey = ev;
+
+    if (!triggerKey) return;
+
+    // Chat que não é comando → balão de fala no personagem
+    if (ev === "chat") {
+      const rawComment = (d.comment || "").trim();
+      const isCommand = !!eventMappings[triggerKey];
+      if (!isCommand && rawComment) {
+        addChatBubble(user, rawComment);
+        return;
+      }
+    }
+
+    const action = eventMappings[triggerKey];
+    if (action) {
+      const rep = eventRepeatCounts[triggerKey] || 1;
+      if (triggerKey === "curtida_like") {
+        if (likeCooldown) return;
+        likeCounter += count;
+        if (likeCounter >= likeThreshold) {
+          likeCooldown = true;
+          executeAction(action, user, avatar, rep);
+          setTimeout(() => {
+            likeCooldown = false;
+            likeCounter = 0;
+          }, 2000);
+        }
+      } else {
+        executeAction(action, user, avatar, rep);
+      }
+    }
+  };
+  socket.onclose = () => { document.getElementById('connDot').classList.remove('online'); setTimeout(connectTikFinity, 5000); };
+}
+
+updateRankingPanel();
+connectTikFinity();
+
+loadImages(()=>requestAnimationFrame(ts=>{lastTime=ts;loop(ts);}));
+
+/* ============================================================
+   INTEGRAÇÃO COM O PAINEL StreamToEarn — postMessage API
+   O painel envia: { type: "SQUID_ACTION", action: "SPAWN_JOGADOR", user: "...", avatar: "..." }
+   (mesmo protocolo usado pelo Pipa Interativa)
+   ============================================================ */
+window.addEventListener("message", function(evt) {
+  if (!evt.data || evt.data.type !== "SQUID_ACTION") return;
+  const { action, user, avatar } = evt.data;
+  if (!action) return;
+  const safeUser = user || "Painel";
+  const safeAvatar = avatar || null;
+  executeAction(action, safeUser, safeAvatar, 1);
+});
+
+// Avisar o painel que o jogo está pronto
+if (window.opener) {
+  window.opener.postMessage({ type: "SQUID_READY" }, "*");
+}
+</script>
+</body>
+</html>

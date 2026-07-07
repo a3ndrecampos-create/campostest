@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batalha de Pipas - TikTok Interactive Edition</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: linear-gradient(#6ec6ff, #dff4ff); 
+            font-family: 'Segoe UI', Arial; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            color: white; 
+            overflow: hidden; 
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        #top-header { 
+            width: 100vw; 
+            background: rgba(15, 15, 25, 0.95); 
+            padding: 10px 14px; 
+            box-sizing: border-box; 
+            border-bottom: 2px solid #ff3030; 
+            overflow: hidden;
+            white-space: nowrap;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        #ranking-marquee {
+            display: inline-block;
+            padding-left: 100%;
+            animation: marquee 22s linear infinite;
+            font-weight: bold;
+            font-size: 14px;
+            color: #00FFCC;
+            letter-spacing: 0.5px;
+        }
+        @keyframes marquee {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-100%, 0, 0); }
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            flex: 1;
+            min-height: 0;
+        }
+        canvas { width: 100%; height: 100%; background: linear-gradient(#6ec6ff, #bce6ff); border: 2px solid #ff3030; border-top: none; display: block;}
+        
+        #festival-timer-display {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #ffd700;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: 900;
+            color: #ffd700;
+            text-shadow: 0 0 5px rgba(255,215,0,0.5);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 10;
+            display: none;
+            pointer-events: none;
+            letter-spacing: 0.5px;
+        }
+
+        /* Container do Pódio do Top 3 sobreposto ao Canvas */
+        #podium-display {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z-index: 20;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            pointer-events: none;
+        }
+        .podium-spot {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 380px;
+            width: 140px;
+            text-align: center;
+        }
+        .podium-avatar {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            object-fit: cover;
+            box-shadow: 0 0 15px rgba(255,255,255,0.4);
+            background: #222;
+        }
+        .podium-avatar.first {
+            width: 120px;
+            height: 120px;
+            border-color: #ffd700;
+            box-shadow: 0 0 25px #ffd700;
+        }
+        .podium-avatar.second {
+            border-color: #e0e0e0;
+            box-shadow: 0 0 20px #e0e0e0;
+        }
+        .podium-avatar.third {
+            border-color: #cd7f32;
+            box-shadow: 0 0 15px #cd7f32;
+        }
+        .podium-name {
+            font-weight: 900;
+            font-size: 14px;
+            margin-top: 10px;
+            text-transform: uppercase;
+            text-shadow: 0 2px 4px #000;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+        }
+        .podium-cuts-badge {
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            font-weight: bold;
+            color: #00ffcc;
+            background: rgba(0,0,0,0.6);
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(0,255,204,0.3);
+            margin-top: 5px;
+        }
+        .podium-base {
+            width: 100%;
+            margin-top: 15px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 24px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .podium-base.first { height: 140px; background: linear-gradient(#ffd700, #b8860b); color: #000; }
+        .podium-base.second { height: 100px; background: linear-gradient(#e0e0e0, #7f8c8d); color: #000; }
+        .podium-base.third { height: 70px; background: linear-gradient(#cd7f32, #874e1d); color: #fff; }
+
+        #waiting-label { width: 100vw; text-align: left; font-size: 14px; color: #000; margin-top: 8px; font-weight: 900; padding-left: 10px; text-shadow: 1px 1px 0 #fff; text-transform: uppercase; letter-spacing: 0.5px;}
+        
+        #waiting-room { 
+            width: 100vw; 
+            height: 160px; 
+            background: rgba(15, 15, 25, 0.9); 
+            margin-top: 5px; 
+            border-radius: 12px; 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            grid-template-rows: repeat(2, 1fr); 
+            gap: 10px; 
+            padding: 12px; 
+            border: 2px solid #3a3a50; 
+            box-sizing: border-box; 
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+        }
+        .ranking-card { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between;
+            background: rgba(255,255,255,0.03);
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+        .ranking-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+        }
+        .ranking-pos {
+            font-size: 13px;
+            font-weight: 900;
+            color: #ff3030;
+            min-width: 25px;
+        }
+        .ranking-pos.top1 { color: #ffd700; font-size: 14px; }
+        .ranking-pos.top2 { color: #e0e0e0; }
+        .ranking-pos.top3 { color: #cd7f32; }
+
+        .avatar-ranking { 
+            width: 36px; 
+            height: 36px; 
+            border-radius: 50%; 
+            border: 2px solid #ff3030; 
+            background: #222; 
+            object-fit: cover; 
+            flex-shrink: 0;
+        }
+        .avatar-ranking.top1 { border-color: #ffd700; box-shadow: 0 0 5px #ffd700; }
+
+        .ranking-info {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .ranking-name {
+            font-size: 13px;
+            font-weight: bold;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+        .ranking-cuts {
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            font-weight: bold;
+            color: #00ffcc;
+            background: rgba(0,0,0,0.4);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(0,255,204,0.2);
+            flex-shrink: 0;
+        }
+
+        .festival-waiting-msg {
+            grid-column: span 3;
+            grid-row: span 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #ff4500;
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            animation: pulse 1.5s infinite alternate;
+        }
+        .festival-waiting-sub {
+            font-size: 12px;
+            color: #888888;
+            margin-top: 5px;
+            font-weight: normal;
+            letter-spacing: 0.5px;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.98); opacity: 0.8; }
+            100% { transform: scale(1.02); opacity: 1; }
+        }
+
+        #bottom-controls { width: 100vw; display: flex; align-items: center; justify-content: center; gap: 12px; background: #000; padding: 10px; border: 1px solid #ff3030; border-top: none; border-radius: 0 0 12px 12px; box-sizing: border-box; }
+        #conn-status { font-size: 10px; display: flex; align-items: center; gap: 6px; color: #888; font-weight: bold; }
+        .dot { width: 10px; height: 10px; background: #444; border-radius: 50%; box-shadow: 0 0 5px #000; }
+        .dot.online { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
+        
+        #player-tools { display: flex; gap: 6px; border-left: 1px solid #222; border-right: 1px solid #222; padding: 0 12px; align-items: center; }
+        #player-name { padding: 5px; background: #111; border: 1px solid #333; color: #ff3030; border-radius: 4px; font-size: 10px; width: 120px; text-transform: uppercase; }
+        .btn-action { padding: 5px 8px; background: #222; border: 1px solid #444; color: white; cursor: pointer; border-radius: 4px; font-size: 9px; font-weight: bold; }
+        
+        #btn-kings { padding: 5px 12px; background: #ffd700; border: 1px solid #b8860b; color: #000; cursor: pointer; border-radius: 4px; font-size: 9px; font-weight: 900; letter-spacing: 0.5px; }
+        #btn-kings.active { background: #ff3030; color: #fff; border-color: #8b0000; }
+
+        #btn-fest-time, #btn-reset-queue { padding: 5px 10px; background: #111; border: 1px solid #333; color: #fff; cursor: pointer; border-radius: 4px; font-size: 9px; font-weight: bold; letter-spacing: 0.3px; }
+        #btn-fest-time:hover, #btn-reset-queue:hover { background: #222; border-color: #555; }
+        #btn-reset-queue { border-color: #c0392b; color: #ff6b6b; }
+        #btn-reset-queue:hover { background: #c0392b; color: #fff; }
+
+        /* Estilo para a opção de Loop do Festival */
+        .loop-container {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            color: #ffd700;
+            cursor: pointer;
+            user-select: none;
+        }
+        .loop-container input {
+            cursor: pointer;
+            width: 12px;
+            height: 12px;
+            accent-color: #ffd700;
+            margin: 0;
+        }
+
+        #btn-config { padding: 5px 10px; background: #111; border: 1px solid #333; color: #888; cursor: pointer; border-radius: 4px; font-size: 9px; }
+        #btn-audio { padding: 5px 10px; background: #111; border: 1px solid #333; color: #fff; cursor: pointer; border-radius: 4px; font-size: 9px; font-weight: bold; }
+
+        .modal { 
+            position: fixed; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            width: 700px; 
+            background: #111; 
+            border: 2px solid #ff3030; 
+            border-radius: 12px; 
+            padding: 15px; 
+            z-index: 3000; 
+            display: none; 
+            color: white; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.9);
+            box-sizing: border-box;
+        }
+        .modal-section {
+            background: #161616;
+            border: 1px solid #222;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        .modal-section-title {
+            font-size: 11px;
+            color: #ff3030;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+        .form-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 2px;
+            align-items: center;
+        }
+        .input-dark {
+            padding: 6px 8px; 
+            background: #000; 
+            color: white; 
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: 11px;
+            box-sizing: border-box;
+        }
+        .select-dark {
+            padding: 6px 8px; 
+            background: #000; 
+            color: white; 
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: 11px;
+            height: 30px;
+            box-sizing: border-box;
+        }
+        .btn-add {
+            background: #ff3030; 
+            border: none; 
+            color: white; 
+            padding: 6px 12px; 
+            cursor: pointer; 
+            font-weight: bold;
+            font-size: 11px;
+            border-radius: 4px;
+            height: 30px;
+        }
+        .btn-add:hover { background: #d62424; }
+        
+        .event-list-container {
+            max-height: 110px; 
+            overflow-y: auto; 
+            background: #090909;
+            border: 1px solid #222;
+            border-radius: 4px;
+            padding: 2px 4px;
+            box-sizing: border-box;
+        }
+        .event-item {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding: 4px 6px; 
+            font-size: 11px; 
+            border-bottom: 1px solid #161616;
+        }
+        .event-item:last-child { border-bottom: none; }
+        .event-actions-group {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .btn-test {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .btn-test:hover { background: #219653; }
+        .btn-del {
+            color: #ff3030; 
+            cursor: pointer; 
+            font-weight: bold;
+            background: transparent;
+            border: none;
+            padding: 0 2px;
+            font-size: 14px;
+        }
+        .btn-del:hover { color: white; }
+        .btn-reset { width: 100%; margin-top: 5px; padding: 8px; background: #c0392b; color: white; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 11px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <div id="top-header">
+        <div id="ranking-marquee">🏆 AGUARDANDO COMANDOS DA LIVE PARA GERAR O PLACAR AO VIVO...</div>
+    </div>
+
+    <div id="canvas-container">
+        <div id="festival-timer-display">👑 FESTIVAL COMEÇA EM: 00:00</div>
+        
+        <!-- Pódio Visual que aparecerá ao fim do evento -->
+        <div id="podium-display"></div>
+
+        <canvas id="game" width="800" height="520"></canvas>
+    </div>
+    
+    <div id="waiting-label">🔥 CLASSIFICAÇÃO TOP 6 DA LIVE:</div>
+    <div id="waiting-room"></div>
+
+    <div id="bottom-controls">
+        <button id="btn-kings" onclick="toggleFestivalMode()">👑 KINGS: DESATIVADO</button>
+
+        <label class="loop-container">
+            <input type="checkbox" id="festivalLoopCheck"> LOOP
+        </label>
+
+        <button id="btn-fest-time" onclick="toggleFestModal()" title="Ajustar o tempo de preparação e combate do Festival">⏱️ TEMPO FESTIVAL</button>
+        <button id="btn-reset-queue" onclick="resetWaitingQueue()" title="Esvazia a fila de espera e zera o placar de cortes">🔄 RESETAR FILA</button>
+        <button id="btn-open-panel" onclick="toggleModal()" title="Abrir o gerenciador completo de eventos interativos" style="display:none;">⚙️ PAINEL</button>
+    </div>
+
+    <div id="festModal" class="modal" style="width: 320px;">
+        <h3 style="margin:0 0 14px 0; color:#ff3030; font-size:15px; font-weight: 900; text-align: center;">🏆 Tempo do Festival (KINGS)</h3>
+        <div class="modal-section" style="margin-bottom: 10px;">
+            <div style="display: flex; gap: 12px;">
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                    <span style="font-size: 11px; color: #aaa; text-align: center;">Tempo Pacífico (Min)</span>
+                    <input type="number" id="festPrepInput" class="input-dark" style="width: 100%; box-sizing: border-box; text-align: center;" min="1" value="2">
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                    <span style="font-size: 11px; color: #aaa; text-align: center;">Tempo Combate (Min)</span>
+                    <input type="number" id="festCombatInput" class="input-dark" style="width: 100%; box-sizing: border-box; text-align: center;" min="1" value="5">
+                </div>
+            </div>
+        </div>
+        <button onclick="saveFestivalDurations()" class="btn-add" style="width:100%; background: #27ae60;">SALVAR TEMPOS</button>
+        <button onclick="toggleFestModal()" style="width:100%; margin-top:5px; padding:7px; background:#333; color:white; border:none; cursor:pointer; font-weight: bold; border-radius: 4px; font-size: 11px;">FECHAR JANELA</button>
+    </div>
+
+    <div id="configModal" class="modal">
+        <h3 style="margin:0 0 10px 0; color:#ff3030; font-size:15px; font-weight: 900; text-align: center;">⚙️ GERENCIADOR DE EVENTOS INTERATIVOS</h3>
+
+        <div class="modal-section">
+            <div class="modal-section-title">⚡ Configuração Isolada de Likes</div>
+            <div class="form-row">
+                <span style="font-size: 11px; color: #aaa;">A cada</span>
+                <input type="number" id="likeThresholdInput" class="input-dark" style="width: 60px; text-align: center;" min="1" value="10">
+                <span style="font-size: 11px; color: #aaa;">Likes, executar:</span>
+                <select id="likeActionSelect" class="select-dark" style="flex: 1;">
+                    <option value="CURA_15">Recupera 15% HP</option>
+                    <option value="CURA_50">Recupera 50% HP</option>
+                    <option value="CURA_100">Recupera 100% HP</option>
+                    <option value="SPAWN_RANDOM">Spawner Aleatório</option>
+                </select>
+                <button onclick="saveLikeConfig()" class="btn-add" style="background: #27ae60;">SALVAR</button>
+                <button onclick="testTrigger('curtida_like')" class="btn-test" style="height: 30px;">TESTAR</button>
+            </div>
+        </div>
+
+        <div class="modal-section">
+            <div class="modal-section-title">👑 Configuração de Novo Membro (Member)</div>
+            <div class="form-row">
+                <span style="font-size: 11px; color: #aaa; flex: 1;">Quando um usuário se tornar membro:</span>
+                <select id="memberActionSelect" class="select-dark" style="width: 240px;">
+                    <option value="SPAWN_RANDOM">Spawner Aleatório</option>
+                    <option value="SPAWN_LARGE">Spawner Pipa Grande (1.5x)</option>
+                    <option value="SPAWN_CEROL">Spawner Pipa Normal + Cerol (Rosa)</option>
+                    <option value="SPAWN_LARGE_CEROL">Spawner Pipa Grande + Cerol (Rosa)</option>
+                    <option value="SPAWN_CEROL_FINO">Spawner Pipa Normal + Cerol Fino (Verde)</option>
+                    <option value="SPAWN_LARGE_CEROL_FINO">Spawner Pipa Grande + Cerol Fino (Verde)</option>
+                    <option value="SPAWN_CHILENA">Spawner Pipa Normal + Chilena (Amarela)</option>
+                    <option value="SPAWN_LARGE_CHILENA">Spawner Pipa Grande + Chilena (Amarela)</option>
+                </select>
+                <button onclick="saveMemberConfig()" class="btn-add" style="background: #27ae60;">SALVAR</button>
+                <button onclick="testTrigger('member')" class="btn-test" style="height: 30px;">TESTAR</button>
+            </div>
+        </div>
+
+        <div class="modal-section">
+            <div class="modal-section-title">📤 Configuração de Compartilhamento (Share)</div>
+            <div class="form-row">
+                <span style="font-size: 11px; color: #aaa; flex: 1;">Quando um usuário compartilhar a live:</span>
+                <select id="shareActionSelect" class="select-dark" style="width: 240px;">
+                    <option value="SPAWN_RANDOM">Spawner Aleatório</option>
+                    <option value="SPAWN_LARGE">Spawner Pipa Grande (1.5x)</option>
+                    <option value="SPAWN_CEROL">Spawner Pipa Normal + Cerol (Rosa)</option>
+                    <option value="SPAWN_LARGE_CEROL">Spawner Pipa Grande + Cerol (Rosa)</option>
+                    <option value="SPAWN_CEROL_FINO">Spawner Pipa Normal + Cerol Fino (Verde)</option>
+                    <option value="SPAWN_LARGE_CEROL_FINO">Spawner Pipa Grande + Cerol Fino (Verde)</option>
+                    <option value="SPAWN_CHILENA">Spawner Pipa Normal + Chilena (Amarela)</option>
+                    <option value="SPAWN_LARGE_CHILENA">Spawner Pipa Grande + Chilena (Amarela)</option>
+                </select>
+                <button onclick="saveShareConfig()" class="btn-add" style="background: #27ae60;">SALVAR</button>
+                <button onclick="testTrigger('compartilhar')" class="btn-test" style="height: 30px;">TESTAR</button>
+            </div>
+        </div>
+
+        <div class="modal-section">
+            <div class="modal-section-title">🎁 Mapear Presentes & Comandos de Chat</div>
+            <div class="form-row">
+                <select id="giftSelector" class="select-dark" style="width: 240px;" onchange="syncGiftInput()">
+                    <option value="">-- Escolha um Presente --</option>
+                    <option value="CUSTOM">-- DIGITAR COMANDO DE CHAT --</option>
+                    <option value="14295">14295 - Dates</option>
+                    <option value="6926">6926 - Basketball</option>
+                    <option value="7250">7250 - Hot Water Bottle</option>
+                    <option value="13298">13298 - Wink Charm</option>
+                    <option value="13651">13651 - Go Popular</option>
+                    <option value="13282">13282 - Slay</option>
+                    <option value="12355">12355 - Club Cheers</option>
+                    <option value="9097">9097 - Birthday Cake</option>
+                    <option value="7073">7073 - Harvest Festival</option>
+                    <option value="9087">9087 - Flame Heart</option>
+                    <option value="7934">7934 - Heart Me</option>
+                    <option value="7213">7213 - Squirrel</option>
+                    <option value="6652">6652 - Lightning Bolt</option>
+                    <option value="6784">6784 - Cake Slice</option>
+                    <option value="6912">6912 - Sem descrição</option>
+                    <option value="5868">5868 - Sem descrição</option>
+                    <option value="7002">7002 - Garden Gnome</option>
+                    <option value="7038">7038 - Sem descrição</option>
+                    <option value="6890">6890 - Love You</option>
+                    <option value="5867">5867 - Sem descrição</option>
+                    <option value="5631">5631 - Sem descrição</option>
+                    <option value="5630">5630 - Sem descrição</option>
+                    <option value="5333">5333 - Coffee</option>
+                    <option value="6247">6247 - Heart</option>
+                    <option value="6246">6246 - Thumbs Up</option>
+                    <option value="6169">6169 - Tennis</option>
+                    <option value="6064">6064 - GG</option>
+                    <option value="6042">6042 - Mini Speaker</option>
+                    <option value="5827">5827 - Ice Cream Cone</option>
+                    <option value="5760">5760 - Weights</option>
+                    <option value="5655">5655 - Rose</option>
+                    <option value="5269">5269 - TikTok</option>
+                    <option value="9139">9139 - Team Bracelet</option>
+                    <option value="7136">7136 - Golden Player</option>
+                    <option value="10179">10179 - Lily of the Valley</option>
+                    <option value="10268">10268 - Easter Egg</option>
+                    <option value="12865">12865 - Bread</option>
+                    <option value="10604">10604 - Tofu</option>
+                    <option value="9287">9287 - Potato</option>
+                    <option value="8815">8815 - Pink Shoes</option>
+                    <option value="6813">6813 - Sem descrição</option>
+                    <option value="6705">6705 - Sem descrição</option>
+                    <option value="5983">5983 - Sem descrição</option>
+                    <option value="5547">5547 - Sem descrição</option>
+                    <option value="6416">6416 - Choc Chip Cookie</option>
+                    <option value="5719">5719 - Fire</option>
+                    <option value="5650">5650 - Mic</option>
+                    <option value="5487">5487 - Finger Heart</option>
+                    <option value="37">37 - Panda</option>
+                    <option value="6519">6519 - Guacamole</option>
+                    <option value="12356">12356 - Club Power</option>
+                    <option value="9622">9622 - Applause</option>
+                    <option value="8243">8243 - Cheer You Up</option>
+                    <option value="6484">6484 - Sem descrição</option>
+                    <option value="6113">6113 - Taco</option>
+                    <option value="6059">6059 - Hand Wave</option>
+                    <option value="13300">13300 - Heart Gaze</option>
+                    <option value="14560">14560 - Easter Potato</option>
+                    <option value="11108">11108 - EWC</option>
+                    <option value="5853">5853 - Gold Boxing Gloves</option>
+                    <option value="10521">10521 - Cherry Blossom Bunny</option>
+                    <option value="9947">9947 - Friendship Necklace</option>
+                    <option value="9458">9458 - ASMR Time</option>
+                    <option value="8913">8913 - Rosa</option>
+                    <option value="7341">7341 - Panther</option>
+                    <option value="6483">6483 - Sem descrição</option>
+                    <option value="6458">6458 - Sem descrição</option>
+                    <option value="6560">6560 - Tiny Diny</option>
+                    <option value="6240">6240 - Sem descrição</option>
+                    <option value="5984">5984 - Sem descrição</option>
+                    <option value="5327">5327 - Sem descrição</option>
+                    <option value="6249">6249 - Rugby Ball</option>
+                    <option value="6052">6052 - Gamepad</option>
+                    <option value="5657">5657 - Lollipop</option>
+                    <option value="14115">14115 - S Flowers</option>
+                    <option value="8552">8552 - Baby Fox</option>
+                    <option value="5740">5740 - Headphones</option>
+                    <option value="5919">5919 - Love You</option>
+                    <option value="5658">5658 - Perfume</option>
+                    <option value="5780">5780 - Bouquet Flower</option>
+                    <option value="6070">6070 - Mirror</option>
+                    <option value="5879">5879 - Doughnut</option>
+                    <option value="5852">5852 - Sem descrição</option>
+                    <option value="8259">8259 - Sign Language Love</option>
+                    <option value="5707">5707 - Love You</option>
+                    <option value="6047">6047 - Sem descrição</option>
+                    <option value="5792">5792 - Sem descrição</option>
+                    <option value="5584">5584 - Sem descrição</option>
+                    <option value="5530">5530 - Sem descrição</option>
+                    <option value="10300">10300 - Butterfly</option>
+                    <option value="8434">8434 - Ruby Red</option>
+                    <option value="7037">7037 - Sem descrição</option>
+                    <option value="6471">6471 - Hi May</option>
+                    <option value="9575">9575 - Family</option>
+                    <option value="9582">9582 - Sending Strength</option>
+                    <option value="14287">14287 - Murtabak</option>
+                    <option value="14126">14126 - Crescent Chain</option>
+                    <option value="14109">14109 - Mark of Love</option>
+                    <option value="13087">13087 - Bubble Gum</option>
+                    <option value="11180">11180 - Love Painting</option>
+                    <option value="12357">12357 - Club Victory</option>
+                    <option value="12678">12678 - Level-up Sparks</option>
+                    <option value="9096">9096 - Birthday Crown</option>
+                    <option value="8156">8156 - My Favourite</option>
+                    <option value="8130">8130 - Like-Pop</option>
+                    <option value="7883">7883 - Guitar</option>
+                    <option value="6525">6525 - Honorable Person</option>
+                    <option value="6559">6559 - Breakthrough Star</option>
+                    <option value="6793">6793 - Ranking Lit</option>
+                    <option value="6723">6723 - Guitar</option>
+                    <option value="5793">5793 - Play Samba</option>
+                    <option value="6435">6435 - Daffodils</option>
+                    <option value="6432">6432 - Star</option>
+                    <option value="6386">6386 - Sem descrição</option>
+                    <option value="6427">6427 - Hat and Mustache</option>
+                    <option value="6097">6097 - Little Crown</option>
+                    <option value="6104">6104 - Cap</option>
+                    <option value="5659">5659 - Paper Crane</option>
+                    <option value="13301">13301 - Singing Magic</option>
+                    <option value="7121">7121 - Marvelous Confetti</option>
+                    <option value="7264">7264 - Mishka Bear</option>
+                    <option value="7163">7163 - Mishka Bear</option>
+                    <option value="6968">6968 - Hand Heart</option>
+                    <option value="6960">6960 - Game Controller</option>
+                    <option value="6467">6467 - Game Controller</option>
+                    <option value="5566">5566 - Mishka Bear</option>
+                    <option value="5585">5585 - Confetti</option>
+                    <option value="5660">5660 - Hand Hearts</option>
+                    <option value="14000">14000 - Bowknot</option>
+                    <option value="6618">6618 - Socks and Sandals</option>
+                    <div style="display:none;" id="ghost-anchors"></div>
+                    <option value="5328">5328 - Sem descrição</option>
+                    <option value="5729">5729 - Butterfly</option>
+                    <option value="5915">5915 - Music Note</option>
+                    <option value="14294">14294 - Sparklers</option>
+                    <option value="14474">14474 - Ramadan Moon</option>
+                    <option value="13981">13981 - Love Charger</option>
+                    <option value="13075">13075 - Cheering Crab</option>
+                    <option value="11177">11177 - Coffee Magic</option>
+                    <option value="10573">10573 - Massage for You</option>
+                    <option value="10560">10560 - Stinging Bee</option>
+                    <option value="9589">9589 - Birthday Glasses</option>
+                    <option value="8600">8600 - Sending Positivity</option>
+                    <option value="8066">8066 - Goggles</option>
+                    <option value="7927">7927 - Puppy Love</option>
+                    <option value="7839">7839 - Shiba Inu</option>
+                    <option value="7549">7549 - Gamer Cat</option>
+                    <option value="7166">7166 - Roman Empire</option>
+                    <option value="6713">6713 - Cheer For You</option>
+                    <option value="6619">6619 - Sem descrição</option>
+                    <option value="6795">6795 - Ranking Lit</option>
+                    <option value="6794">6794 - Ranking Lit</option>
+                    <option value="6796">6796 - Ranking Lit</option>
+                    <option value="6744">6744 - Sem descrição</option>
+                    <option value="6671">6671 - Love You</option>
+                    <option value="6486">6486 - Sem descrição</option>
+                    <option value="5794">5794 - Sem descrição</option>
+                    <option value="6436">6436 - Love Focus</option>
+                    <option value="6437">6437 - Garland Headpiece</option>
+                    <option value="6194">6194 - Sem descrição</option>
+                    <option value="5937">5937 - Hanging Lights</option>
+                    <option value="5880">5880 - Lock and Key</option>
+                    <option value="5586">5586 - Hearts</option>
+                    <option value="5734">5734 - Goggles</option>
+                    <option value="5509">5509 - Sunglasses</option>
+                    <option value="5896">5896 - Sem descrição</option>
+                    <option value="5599">5599 - Gold Necklace</option>
+                    <option value="5326">5326 - Sem descrição</option>
+                    <option value="10547">10547 - Pinch Face</option>
+                    <option value="5532">5532 - Sem descrição</option>
+                    <option value="14142">14142 - Ramadan Crescent</option>
+                    <option value="8141">8141 - Ramadan Crescent</option>
+                    <option value="14418">14418 - Ramadan Crescent</option>
+                    <option value="13073">13073 - Butterfly for You</option>
+                    <option value="11808">11808 - Rock Star</option>
+                    <option value="11183">11183 - Play for You</option>
+                    <option value="11179">11179 - Naughty Chicken</option>
+                    <option value="10574">10574 - Dancing Flower</option>
+                    <option value="9465">9465 - Fruit Friends</option>
+                    <option value="8873">8873 - TikTok Crown</option>
+                    <option value="8260">8260 - Elephant Trunk</option>
+                    <option value="7503">7503 - We Love</option>
+                    <option value="8111">8111 - Superpower</option>
+                    <option value="7222">7222 - Full Moon</option>
+                    <option value="6868">6868 - Hedgehog</option>
+                    <option value="6752">6752 - Friend</option>
+                    <option value="6531">6531 - Sem descrição</option>
+                    <option value="6532">6532 - Dancing Cactus</option>
+                    <option value="6050">6050 - Sem descrição</option>
+                    <option value="6034">6034 - Sem descrição</option>
+                    <option value="5902">5902 - Bridal Veil</option>
+                    <option value="6265">6265 - Duck</option>
+                    <option value="6267">6267 - Corgi</option>
+                    <option value="6007">6007 - Boxing Gloves</option>
+                    <option value="5882">5882 - Rock 'n' Roll</option>
+                    <option value="13987">13987 - Feather Mask</option>
+                    <option value="5329">5329 - Sem descrição</option>
+                    <option value="5661">5661 - Air Dancer</option>
+                    <option value="6071">6071 - Birthday Cake</option>
+                    <option value="5843">5843 - Sem descrição</option>
+                    <option value="14214">14214 - Let Butterfly Dances</option>
+                    <option value="14507">14507 - Ketupat Tree</option>
+                    <option value="14131">14131 - Ramadan Gift Box</option>
+                    <option value="14110">14110 - You Are Loved</option>
+                    <option value="11181">11181 - Tom's Hug</option>
+                    <option value="11178">11178 - Relaxed Goose</option>
+                    <option value="12210">12210 - Rosie the Rose Bean</option>
+                    <option value="12211">12211 - Jollie the Joy Bean</option>
+                    <option value="12212">12212 - Rocky the Rock Bean</option>
+                    <option value="12213">12213 - Sage the Smart Bean</option>
+                    <option value="10395">10395 - Gaming Headset</option>
+                    <option value="8107">8107 - Flower Flight</option>
+                    <option value="9825">9825 - Magic Rhythm</option>
+                    <option value="8852">8852 - Cotton the Seal</option>
+                    <option value="8914">8914 - Forever Rosa</option>
+                    <option value="6073">6073 - Sweet Dreams</option>
+                    <option value="5899">5899 - Swing</option>
+                    <option value="13999">13999 - Wishing Cake</option>
+                    <option value="6205">6205 - Love Chat</option>
+                    <option value="5662">5662 - Necklace</option>
+                    <option value="11809">11809 - Beating Heart</option>
+                    <option value="14002">14002 - Fairy Mask</option>
+                    <option value="13983">13983 - Fortune Kitty</option>
+                    <option value="8750">8750 - Gold Microphone</option>
+                    <option value="8244">8244 - Hands Up</option>
+                    <option value="6415">6415 - Music</option>
+                    <option value="5731">5731 - Coral</option>
+                    <option value="10669">10669 - Future City</option>
+                    <option value="7841">7841 - With You</option>
+                    <option value="8604">8604 - Starfish Bay</option>
+                    <option value="8263">8263 - Yellow Bus</option>
+                    <option value="5627">5627 - Romantic Carriage</option>
+                    <option value="9467">9467 - Lili the Leopard</option>
+                    <option value="14293">14293 - Ramadan Night</option>
+                    <option value="9095">9095 - Birthday Party</option>
+                    <option value="8247">8247 - Happy Party</option>
+                    <option value="6790">6790 - Celebration Time</option>
+                    <option value="10176">10176 - 2nd Anniversary</option>
+                    <option value="6089">6089 - Sports Car</option>
+                    <option value="11599">11599 - Dubai</option>
+                    <option value="8420">8420 - Star Throne</option>
+                    <option value="8104">8104 - Monster Truck</option>
+                    <option value="7764">7764 - Star Throne</option>
+                    <option value="7078">7078 - Match Cup</option>
+                    <option value="8916">8916 - Leon and Lili</option>
+                    <option value="6103">6103 - Yacht</option>
+                    <option value="5803">5803 - Beach House</option>
+                    <option value="13307">13307 - Luxury Yacht</option>
+                    <option value="8417">8417 - Octopus</option>
+                    <option value="6203">6203 - Sunset Speedway</option>
+                    <option value="6149">6149 - Interstellar</option>
+                    <option value="7627">7627 - Falcon</option>
+                    <option value="6271">6271 - Falcon</option>
+                    <option value="6367">6367 - Falcon</option>
+                    <option value="10177">10177 - 3rd Anniversary</option>
+                    <option value="8599">8599 - Convertible Car</option>
+                    <option value="8419">8419 - Red Lightning</option>
+                    <option value="6892">6892 - Race Car</option>
+                    <option value="12678">12678 - Level-up Sparks</option>
+                    <option value="12680">12680 - Level-up Spectacle</option>
+                    <option value="6520">6520 - Camping Night</option>
+                    <option value="14310">14310 - Tidecaller Trident</option>
+                    <option value="13790">13790 - Invincible Hammer</option>
+                    <option value="11586">11586 - Party On&On</option>
+                    <option value="10670">10670 - Future Journey</option>
+                    <option value="8737">8737 - Speedster</option>
+                    <option value="8912">8912 - Rosa Nebula</option>
+                    <option value="9086">9086 - Man V Seagull</option>
+                    <option value="8435">8435 - Pyramids</option>
+                    <option value="8387">8387 - Peacock</option>
+                    <option value="7978">7978 - Leopard</option>
+                    <option value="7598">7598 - Pirate's Ship</option>
+                    <option value="7911">7911 - Mammoth</option>
+                    <option value="5954">5954 - Planet</option>
+                    <option value="9466">9466 - Amusement Park</option>
+                    <option value="14129">14129 - Ramadan Celebration</option>
+                    <option value="14132">14132 - Ramadan Celebration</option>
+                    <option value="10398">10398 - Spark</option>
+                    <option value="7125">7125 - Premium Shuttle</option>
+                    <option value="6833">6833 - Castle Fantasy</option>
+                    <option value="6751">6751 - TikTok Shuttle</option>
+                    <option value="5930">5930 - Rocket</option>
+                    <option value="14311">14311 - Undersea Kingdom</option>
+                    <option value="13791">13791 - Chasing Glory</option>
+                    <option value="7987">7987 - Griffin</option>
+                    <option value="7400">7400 - Adam's Dream</option>
+                    <option value="7319">7319 - Phoenix</option>
+                    <option value="7610">7610 - Dragon Flame</option>
+                    <option value="6625">6625 - Towards the Future</option>
+                    <option value="7311">7311 - Knee Sliding</option>
+                    <option value="6369">6369 - Lion</option>
+                    <option value="12260">12260 - TikTok Houses Glory</option>
+                    <option value="8814">8814 - Superhero Fight</option>
+                    <option value="8602">8602 - Gorilla</option>
+                    <option value="8391">8391 - Sam the Whale</option>
+                    <option value="8456">Zeus</option>
+                    <option value="7823">7823 - Leon and Lion</option>
+                    <option value="8381">8381 - Seal and Whale</option>
+                    <div style="display:none;" id="ghost-anchors"></div>
+                    <option value="7312">7312 - TikTok Universe+</option>
+                    <option value="6039">6039 - TikTok Universe</option>
+                    <option value="8651">8651 - Thunder Falcon</option>
+                    <option value="8582">8582 - TikTok Stars</option>
+                    <option value="9092">9092 - Fire Phoenix</option>
+                    <option value="14312">14312 - Lord Marcellus</option>
+                    <option value="13792">13792 - Julius the Champion</option>
+                    <option value="9427">9427 - Pegasus</option>
+                    <option value="9101">9101 - TikTok Universe</option>
+                    <option value="9072">9072 - TikTok Universe</option>
+                </select>
+
+                <input type="text" id="cmdInput" placeholder="Código ou Palavra" class="input-dark" style="width: 110px;">
+                
+                <select id="actionSelect" class="select-dark" style="flex:1;">
+                    <option value="SPAWN_RANDOM">Spawner Aleatório</option>
+                    <option value="SPAWN_LARGE">Spawner Pipa Grande (1.5x)</option>
+                    <option value="SPAWN_CEROL">Spawner Pipa Normal + Cerol (Rosa)</option>
+                    <option value="SPAWN_LARGE_CEROL">Spawner Pipa Grande + Cerol (Rosa) ✅</option>
+                    <option value="SPAWN_CEROL_FINO">Spawner Pipa Normal + Cerol Fino (Verde)</option>
+                    <option value="SPAWN_LARGE_CEROL_FINO">Spawner Pipa Grande + Cerol Fino (Verde)</option>
+                    <option value="SPAWN_CHILENA">Spawner Pipa Normal + Chilena (Amarela)</option>
+                    <option value="SPAWN_LARGE_CHILENA">Spawner Pipa Grande + Chilena (Amarela)</option>
+                    <option value="CEROL">Cerol (5x dano - Rosa)</option>
+                    <option value="CEROL_FINO">Cerol Fino (10x dano - Verde)</option>
+                    <option value="CHILENA">Chilena (15x dano - Amarelo)</option>
+                    <option value="CURA_15">Recupera 15% HP</option>
+                    <option value="CURA_50">Recupera 50% HP</option>
+                    <option value="CURA_100">Recupera 100% HP</option>
+                </select>
+                <button onclick="addEvent()" class="btn-add">ADD</button>
+            </div>
+        </div>
+
+        <div class="modal-section" style="margin-bottom: 5px;">
+            <div class="modal-section-title">📋 Lista de Comandos Ativos Atualmente</div>
+            <div id="event-list" class="event-list-container"></div>
+        </div>
+
+        <button class="btn-reset" onclick="resetRanking()">RESETAR PLACAR DE CORTES</button>
+        <button onclick="toggleModal()" style="width:100%; margin-top:5px; padding:7px; background:#333; color:white; border:none; cursor:pointer; font-weight: bold; border-radius: 4px; font-size: 11px;">FECHAR JANELA</button>
+    </div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+    const container = document.getElementById("canvas-container");
+    const rect = container.getBoundingClientRect();
+    canvas.width = Math.round(rect.width);
+    canvas.height = Math.round(rect.height);
+}
+resizeCanvas();
+let _resizeTimeout;
+window.addEventListener("resize", () => {
+    clearTimeout(_resizeTimeout);
+    _resizeTimeout = setTimeout(resizeCanvas, 150);
+});
+
+/* ------------------------------------------------------------------------
+   Fix: no Electron, a janela às vezes ainda não terminou de aplicar o
+   tamanho final (ou fontes/layout do header ainda estão se ajustando) no
+   exato instante em que este script roda — por isso o canvas nasce com o
+   tamanho errado ("cortado") e só corrige quando o usuário redimensiona
+   manualmente (o que dispara o "resize" acima).
+   O ResizeObserver resolve isso de vez: ele reage a QUALQUER mudança real
+   de tamanho do container (inclusive o ajuste que o Electron faz logo
+   após abrir a janela), sem depender do evento "resize" da window.
+   ------------------------------------------------------------------------ */
+if (window.ResizeObserver) {
+    const canvasContainerEl = document.getElementById("canvas-container");
+    const ro = new ResizeObserver(() => resizeCanvas());
+    ro.observe(canvasContainerEl);
+}
+// Reforço extra: garante o tamanho certo assim que tudo (fontes, imagens) carregar,
+// e mais um frame depois disso, cobrindo qualquer reflow de última hora.
+window.addEventListener("load", () => {
+    resizeCanvas();
+    requestAnimationFrame(resizeCanvas);
+    setTimeout(resizeCanvas, 300);
+});
+
+const PATH = "assets/";
+const avatarCache = {};
+
+const imgBackground = new Image();
+imgBackground.src = `${PATH}bground.png`;
+
+const imagensPipas = [];
+const caminhos = ['pipa.png', 'pipa2.png', 'pipa3.png'];
+caminhos.forEach(arq => {
+  const img = new Image();
+  img.src = `${PATH}${arq}`;
+  imagensPipas.push(img);
+});
+
+let pipas = [];
+let waitingQueue = []; 
+let particulas = []; 
+
+let likeCounter = 0;
+let likeCooldown = false;
+let audioMutado = false;
+
+let festivalAtivo = false;
+let festivalEstado = "prep"; 
+let festivalTimer = null;
+let tempoRestanteFestival = 0;
+let duracaoPrepMinutos = parseInt(localStorage.getItem('pipa_fest_prep')) || 2;
+let duracaoCombatMinutos = parseInt(localStorage.getItem('pipa_fest_combat')) || 5;
+
+document.getElementById('festPrepInput').value = duracaoPrepMinutos;
+document.getElementById('festCombatInput').value = duracaoCombatMinutos;
+
+let winStats = JSON.parse(localStorage.getItem('pipa_cut_stats')) || {}; 
+let eventMappings = JSON.parse(localStorage.getItem('pipa_events')) || { 
+    "member": "SPAWN_RANDOM", 
+    "compartilhar": "SPAWN_RANDOM",
+    "5655": "CEROL", 
+    "rose": "CEROL",
+    "curtida_like": "CURA_15"
+};
+
+// Migração: renomeia chave "membro" para "member" se necessário
+if (eventMappings["membro"] && !eventMappings["member"]) {
+    eventMappings["member"] = eventMappings["membro"];
+    delete eventMappings["membro"];
+    localStorage.setItem('pipa_events', JSON.stringify(eventMappings));
+}
+
+let likeThreshold = parseInt(localStorage.getItem('pipa_like_threshold')) || 10;
+let damageGlobalMultiplier = 0.3;
+document.getElementById('likeThresholdInput').value = likeThreshold;
+if(eventMappings["curtida_like"]) document.getElementById('likeActionSelect').value = eventMappings["curtida_like"];
+if(eventMappings["member"]) document.getElementById('memberActionSelect').value = eventMappings["member"];
+if(eventMappings["compartilhar"]) document.getElementById('shareActionSelect').value = eventMappings["compartilhar"];
+
+function falarTexto(texto) {
+    // Jogo sem som: função desativada intencionalmente (no-op).
+    return;
+}
+
+function saveFestivalDurations() {
+    duracaoPrepMinutos = parseInt(document.getElementById('festPrepInput').value) || 2;
+    duracaoCombatMinutos = parseInt(document.getElementById('festCombatInput').value) || 5;
+    localStorage.setItem('pipa_fest_prep', duracaoPrepMinutos);
+    localStorage.setItem('pipa_fest_combat', duracaoCombatMinutos);
+    alert("Tempos do Festival salvos!");
+}
+
+function toggleFestivalMode() {
+    const btn = document.getElementById('btn-kings');
+    const display = document.getElementById('festival-timer-display');
+    const podium = document.getElementById('podium-display');
+
+    if (!festivalAtivo) {
+
+        festivalAtivo = true;
+        btn.innerHTML = "👑 KINGS: ATIVADO";
+        btn.classList.add('active');
+        display.style.display = "block";
+        
+        winStats = {};
+        localStorage.removeItem('pipa_cut_stats');
+        
+        updateWinRankingUI();
+
+        festivalEstado = "prep";
+        tempoRestanteFestival = duracaoPrepMinutos * 60;
+        falarTexto("O modo festival está ativo! Preparem-se!");
+        
+        atualizarTextoCronometro();
+
+        if(festivalTimer) clearInterval(festivalTimer);
+        festivalTimer = setInterval(processarCronometroFestival, 1000);
+    } else {
+        finalizarModoFestival(false);
+    }
+}
+
+function processarCronometroFestival() {
+    if (!festivalAtivo) return;
+
+    if (tempoRestanteFestival > 0) {
+        tempoRestanteFestival--;
+        atualizarTextoCronometro();
+    } else {
+        if (festivalEstado === "prep") {
+
+            const podium = document.getElementById('podium-display');
+            podium.style.display = "none";
+            podium.innerHTML = "";
+
+            festivalEstado = "combat";
+            tempoRestanteFestival = duracaoCombatMinutos * 60;
+            atualizarTextoCronometro();
+            updateWinRankingUI(); 
+            falarTexto("O festival começou! Combate liberado!");
+        } else if (festivalEstado === "combat") {
+            finalizarModoFestival(true);
+        }
+    }
+}
+
+function atualizarTextoCronometro() {
+    const display = document.getElementById('festival-timer-display');
+    const minutos = String(Math.floor(tempoRestanteFestival / 60)).padStart(2, '0');
+    const segundos = String(tempoRestanteFestival % 60).padStart(2, '0');
+    
+    if (festivalEstado === "prep") {
+        display.innerHTML = `👑 FESTIVAL COMEÇA EM: ${minutos}:${segundos}`;
+        display.style.borderColor = "#ffd700";
+        display.style.color = "#ffd700";
+    } else {
+        display.innerHTML = `⚔️ COMBATE TERMINA EM: ${minutos}:${segundos}`;
+        display.style.borderColor = "#ff3030";
+        display.style.color = "#ff3030";
+    }
+}
+
+function finalizarModoFestival(tempoAcabou) {
+    festivalAtivo = false;
+    if(festivalTimer) clearInterval(festivalTimer);
+    
+    const btn = document.getElementById('btn-kings');
+    const display = document.getElementById('festival-timer-display');
+    const podium = document.getElementById('podium-display');
+    
+    btn.innerHTML = "👑 KINGS: DESATIVADO";
+    btn.classList.remove('active');
+    display.style.display = "none";
+
+    if (!tempoAcabou) {
+        podium.style.display = "none";
+        podium.innerHTML = "";
+    }
+
+    if (tempoAcabou) {
+        const sorted = Object.entries(winStats).sort((a, b) => b[1].cuts - a[1].cuts);
+        if (sorted.length > 0) {
+            falarTexto(`O festival terminou! O grande rei do festival é ${sorted[0][0]}!`);
+            
+            // Monta e exibe a tela de avatares do Top 3
+            const podium = document.getElementById('podium-display');
+            
+            const p1 = sorted[0] ? sorted[0] : null;
+            const p2 = sorted[1] ? sorted[1] : null;
+            const p3 = sorted[2] ? sorted[2] : null;
+
+            const avatar1 = p1 && p1[1].avatar ? p1[1].avatar : (p1 ? avatarCache[p1[0]] || null : null);
+            const avatar2 = p2 && p2[1].avatar ? p2[1].avatar : (p2 ? avatarCache[p2[0]] || null : null);
+            const avatar3 = p3 && p3[1].avatar ? p3[1].avatar : (p3 ? avatarCache[p3[0]] || null : null);
+
+            let htmlPodio = "";
+
+            // Bloco do 2º Lugar
+            if(p2) {
+                htmlPodio += `
+                    <div class="podium-spot">
+                        ${avatar2 ? `<img class="podium-avatar second" src="${avatar2}">` : `<div style="width:90px; height:90px; background:#222; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:40px; border: 4px solid #e0e0e0; box-shadow: 0 0 20px #e0e0e0;">🪁</div>`}
+                        <div class="podium-name">${p2[0]}</div>
+                        <div class="podium-cuts-badge">${p2[1].cuts} Cortes</div>
+                        <div class="podium-base second">2</div>
+                    </div>
+                `;
+            } else {
+                htmlPodio += `<div class="podium-spot"><div class="podium-base second" style="background:#222; color:#444;">-</div></div>`;
+            }
+
+            // Bloco do 1º Lugar
+            if(p1) {
+                htmlPodio += `
+                    <div class="podium-spot">
+                        ${avatar1 ? `<img class="podium-avatar first" src="${avatar1}">` : `<div style="width:120px; height:120px; background:#ffd700; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:50px; border: 4px solid #ffd700; box-shadow: 0 0 25px #ffd700;">👑</div>`}
+                        <div class="podium-name" style="font-size:16px; color:#ffd700;">${p1[0]}</div>
+                        <div class="podium-cuts-badge" style="color:#ffd700; border-color:#ffd700;">${p1[1].cuts} Cortes</div>
+                        <div class="podium-base first">1</div>
+                    </div>
+                `;
+            } else {
+                htmlPodio += `<div class="podium-spot"><div class="podium-base first" style="background:#222; color:#444;">-</div></div>`;
+            }
+
+            // Bloco do 3º Lugar
+            if(p3) {
+                htmlPodio += `
+                    <div class="podium-spot">
+                        ${avatar3 ? `<img class="podium-avatar third" src="${avatar3}">` : `<div style="width:90px; height:90px; background:#222; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:40px; border: 4px solid #cd7f32; box-shadow: 0 0 15px #cd7f32;">🪁</div>`}
+                        <div class="podium-name">${p3[0]}</div>
+                        <div class="podium-cuts-badge">${p3[1].cuts} Cortes</div>
+                        <div class="podium-base third">3</div>
+                    </div>
+                `;
+            } else {
+                htmlPodio += `<div class="podium-spot"><div class="podium-base third" style="background:#222; color:#444;">-</div></div>`;
+            }
+
+            podium.innerHTML = htmlPodio;
+            podium.style.display = "flex";
+        } else {
+            falarTexto("O festival terminou sem nenhum corte!");
+        }
+    } else {
+        falarTexto("O modo festival foi encerrado.");
+    }
+    festivalEstado = "prep";
+    updateWinRankingUI();
+
+    // Verificação e execução do Loop Automático do Festival
+    if (tempoAcabou) {
+        const loopHabilitado = document.getElementById('festivalLoopCheck').checked;
+        if (loopHabilitado) {
+            setTimeout(() => {
+                toggleFestivalMode();
+            }, 1500); // 1.5 segundos de intervalo estratégico para a live carregar o novo ciclo
+        }
+    }
+}
+
+function updateWinRankingUI() {
+    const sorted = Object.entries(winStats).sort((a, b) => b[1].cuts - a[1].cuts);
+
+    if (festivalAtivo) {
+        if(festivalEstado === "prep") {
+            document.getElementById('ranking-marquee').innerHTML = `👑 MODO FESTIVAL ATIVADO: FAZENDO ENTRADA DE NOVOS JOGADORES NA ARENA... ENVIE SEU COMANDO! 👑`;
+        } else {
+            if(sorted.length === 0) {
+                document.getElementById('ranking-marquee').innerHTML = `⚔️ COMBATE DO FESTIVAL LIBERADO! CORTE SEUS ADVERSÁRIOS PARA ASSUMIR O TRONO! ⚔️`;
+            } else {
+                const stringRanking = sorted.slice(0, 5).map(([name, data], i) => `⭐ ${i+1}º ${name.toUpperCase()} (${data.cuts} Cortes)`).join('    ');
+                document.getElementById('ranking-marquee').innerHTML = `👑 PLACAR DO FESTIVAL:    ${stringRanking}    ⭐`;
+            }
+        }
+    } else {
+        if(sorted.length === 0) {
+            document.getElementById('ranking-marquee').innerHTML = `🏆 PLACAR AO VIVO: NENHUM CORTE REGISTRADO ATINJA O TOPO ENVIANDO SEU COMANDO!`;
+        } else {
+            const stringRanking = sorted.slice(0, 5).map(([name, data], i) => `⭐ ${i+1}º ${name.toUpperCase()} (${data.cuts} Cortes)`).join('    ');
+            document.getElementById('ranking-marquee').innerHTML = `🏆 RANKING DE CORTES DA LIVE:    ${stringRanking}    ⭐`;
+        }
+    }
+
+    const container = document.getElementById('waiting-room');
+    
+    if (festivalAtivo && festivalEstado === "prep") {
+        container.innerHTML = `
+            <div class="festival-waiting-msg">
+                <span>👑 FESTIVAL COMEÇA EM...</span>
+                <span class="festival-waiting-sub">Aguardando a entrada e preparação de novos jogadores na arena</span>
+            </div>
+        `;
+        return;
+    }
+
+    let htmlGrid = "";
+    for (let i = 0; i < 6; i++) {
+        if (sorted[i]) {
+            const [name, data] = sorted[i];
+            const avImg = data.avatar || avatarCache[name] || null;
+            const nomeExibicao = name.length > 14 ? name.substring(0, 14) + ".." : name;
+
+            let classePos = "";
+            let iconePos = `${i+1}º`;
+            let classeAvatar = "";
+            if (i === 0) { iconePos = "🥇 1º"; classePos = "top1"; classeAvatar = "top1"; }
+            else if (i === 1) { iconePos = "🥈 2º"; classePos = "top2"; }
+            else if (i === 2) { iconePos = "🥉 3º"; classePos = "top3"; }
+
+            htmlGrid += `
+                <div class="ranking-card">
+                    <div class="ranking-left">
+                        <div class="ranking-pos ${classePos}">${iconePos}</div>
+                        ${avImg ? `<img class="avatar-ranking ${classeAvatar}" src="${avImg}">` : `<div style="width:36px; height:36px; background:#ff3030; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:15px; border: 2px solid #ff3030; flex-shrink:0;">🪁</div>`}
+                        <div class="ranking-info">
+                            <span class="ranking-name">${nomeExibicao}</span>
+                        </div>
+                    </div>
+                    <div class="ranking-cuts">${data.cuts} C</div>
+                </div>
+            `;
+        } else {
+            htmlGrid += `
+                <div class="ranking-card" style="opacity: 0.25;">
+                    <div class="ranking-left">
+                        <div class="ranking-pos">${i+1}º</div>
+                        <div style="width:36px; height:36px; background:#222; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; border: 2px solid #444; flex-shrink:0;">-</div>
+                        <div class="ranking-info">
+                            <span class="ranking-name">VAZIO</span>
+                        </div>
+                    </div>
+                    <div class="ranking-cuts">0 C</div>
+                </div>
+            `;
+        }
+    }
+    container.innerHTML = htmlGrid;
+}
+
+function resetRanking() {
+    if(confirm("Deseja zerar o placar de cortes?")) {
+        winStats = {}; localStorage.removeItem('pipa_cut_stats'); updateWinRankingUI();
+    }
+}
+
+function resetWaitingQueue() {
+    waitingQueue = [];
+    winStats = {};
+    localStorage.removeItem('pipa_cut_stats');
+    updateWinRankingUI();
+}
+
+function getIntersectionPoint(a,b,c,d,p,q,r,s){
+ const den=((a-b)*(r-s)-(c-d)*(p-q));
+ if(den===0) return null;
+ const t=((a-p)*(r-s)-(c-q)*(p-q))/den;
+ const u=-((a-b)*(c-q)-(c-d)*(a-p))/den;
+ if(t>0 && t<1 && u>0 && u<1) return { x: a + t * (b - a), y: c + t * (d - c) };
+ return null;
+}
+
+const MAX_PARTICULAS = 300;
+
+let _rankingDirty = false;
+let _rankingTimer = null;
+function scheduleRankingUpdate() {
+    if (_rankingDirty) return;
+    _rankingDirty = true;
+    _rankingTimer = setTimeout(() => { _rankingDirty = false; updateWinRankingUI(); }, 500);
+}
+
+let _saveStatsTimer = null;
+function scheduleSaveStats() {
+    clearTimeout(_saveStatsTimer);
+    _saveStatsTimer = setTimeout(() => {
+        localStorage.setItem('pipa_cut_stats', JSON.stringify(winStats));
+    }, 1000);
+}
+
+class Particula {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 4;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed - 1;
+    this.alpha = 1.0; 
+    this.decay = 0.02 + Math.random() * 0.03;
+    this.size = 1.5 + Math.random() * 2; 
+    this.gravity = 0.15;
+  }
+  update() { this.vy += this.gravity; this.x += this.vx; this.y += this.vy; this.alpha -= this.decay; }
+  draw() {
+    ctx.save(); ctx.globalAlpha = this.alpha;
+    if (this.alpha > 0.7) { ctx.fillStyle = "#ffffff"; }
+    else if (this.alpha > 0.4) { ctx.fillStyle = "#ffdb4d"; }
+    else { ctx.fillStyle = "#ff5500"; }
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+}
+
+class Pipa {
+ constructor(nome, avatarUrl = null, isLarge = false, spawnMultiplier = 1.0, spawnLineColor = "#ffffff", spawnGlow = false){
+  this.nome = nome;
+  this.isLarge = isLarge;
+  this.x = 100 + Math.random() * (canvas.width - 200);
+  this.y = 50 + Math.random() * (canvas.height * 0.3);
+  this.anchorX = 50 + Math.random() * (canvas.width - 100);
+  this.anchorY = canvas.height;
+  this.anchorOffset = Math.random() * 100;
+  this.angle = Math.random() * Math.PI * 2;
+  this.wave = Math.random() * 100;
+  this.speed = 3.0;
+  this.hp = 100;
+  this.cortada = false;
+  this.dead = false;
+  
+  this.damageMultiplier = spawnMultiplier;
+  this.lineColor = spawnLineColor;
+  this.glowActive = spawnGlow;
+
+  const baseWidth = 38.4;
+  const baseHeight = 48;
+  this.width = isLarge ? baseWidth * 1.5 : baseWidth;
+  this.height = isLarge ? baseHeight * 1.5 : baseHeight;
+  
+  const indiceAleatorio = Math.floor(Math.random() * imagensPipas.length);
+  this.sprite = imagensPipas[indiceAleatorio];
+
+  this.avatarUrl = avatarUrl;
+  this.avatarImg = null;
+  if (avatarUrl) {
+    if (!avatarCache[avatarUrl]) {
+        const img = new Image();
+        img.src = avatarUrl;
+        avatarCache[avatarUrl] = img;
+    }
+    this.avatarImg = avatarCache[avatarUrl];
+  }
+
+  this.tail = [];
+  for(let i=0; i<22; i++) this.tail.push({x:this.x, y:this.y+i*8});
+ }
+
+ update(){
+  if(this.cortada){
+    this.angle += 0.12; this.y += 2.2; this.x += Math.sin(this.angle) * 1.5;
+    if(this.y > canvas.height + 80) this.dead = true;
+  } else {
+    this.wave += 0.03;
+    const chaoReal = canvas.height * 0.8;
+    const zonaDeAlerta = chaoReal - 50;
+
+    if (this.y > zonaDeAlerta) {
+      const proximidadeChao = (this.y - zonaDeAlerta) / (chaoReal - zonaDeAlerta);
+      let targetAngle = -Math.PI / 2;
+      let angleDiff = targetAngle - this.angle;
+      angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+      this.angle += angleDiff * 0.08 * proximidadeChao;
+    } else {
+      this.angle += Math.sin(this.wave) * 0.03 + (Math.random() - 0.5) * 0.12;
+    }
+
+    const margem = 75; 
+    let forcaCurva = 0.09; 
+    let tratadoPorQuina = false;
+
+    if (this.y < margem && (this.x < margem || this.x > canvas.width - margem)) {
+        tratadoPorQuina = true;
+        let targetAngle = Math.atan2(canvas.height * 0.5 - this.y, canvas.width * 0.5 - this.x);
+        let diff = Math.atan2(Math.sin(targetAngle - this.angle), Math.cos(targetAngle - this.angle));
+        this.angle += diff * (forcaCurva * 1.5);
+    }
+
+    if (!tratadoPorQuina) {
+        if (this.x < margem) {
+            let fator = (margem - this.x) / margem;
+            let targetAngle = 0; 
+            let diff = Math.atan2(Math.sin(targetAngle - this.angle), Math.cos(targetAngle - this.angle));
+            this.angle += diff * forcaCurva * fator;
+        }
+        else if (this.x > canvas.width - margem) {
+            let fator = (this.x - (canvas.width - margem)) / margem;
+            let targetAngle = Math.PI; 
+            let diff = Math.atan2(Math.sin(targetAngle - this.angle), Math.cos(targetAngle - this.angle));
+            this.angle += diff * forcaCurva * fator;
+        }
+        if (this.y < margem) {
+            let fator = (margem - this.y) / margem;
+            let targetAngle = Math.PI / 2; 
+            let diff = Math.atan2(Math.sin(targetAngle - this.angle), Math.cos(targetAngle - this.angle));
+            this.angle += diff * forcaCurva * fator;
+        }
+    }
+
+    this.x += Math.cos(this.angle) * this.speed;
+    this.y += Math.sin(this.angle) * this.speed;
+
+    if (this.x < 25) this.x = 25;
+    if (this.x > canvas.width - 25) this.x = canvas.width - 25;
+    if (this.y < 25) this.y = 25;
+    if (this.y > chaoReal) { this.y = chaoReal; this.angle = -Math.PI / 2; }
+    this.anchorX += Math.sin(performance.now() * 0.001 + this.anchorOffset) * 0.3;
+  }
+
+  const tailAngle = this.angle + Math.PI / 2;
+  this.tail[0] = { x: this.x - Math.sin(tailAngle) * (this.height/2), y: this.y + Math.cos(tailAngle) * (this.height/2) };
+
+  for(let i=1; i<this.tail.length; i++){
+    let p=this.tail[i-1], c=this.tail[i];
+    let dx=p.x-c.x, dy=p.y-c.y, d=Math.hypot(dx,dy);
+    if(d>10){ c.x=p.x-dx/d*10; c.y=p.y-dy/d*10; }
+    c.x += Math.sin(performance.now() * 0.005 + i * 0.4) * 0.32;
+    if(this.cortada) c.y += 0.5;
+  }
+ }
+
+ draw(){
+  if(!this.cortada){
+    ctx.save();
+    ctx.strokeStyle = this.lineColor;
+    ctx.lineWidth = this.glowActive ? 4 : 2;
+    if(this.glowActive) { ctx.shadowBlur = 10; ctx.shadowColor = this.lineColor; }
+    ctx.beginPath(); ctx.moveTo(this.anchorX, this.anchorY); ctx.lineTo(this.x, this.y); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.lineWidth = 2.5;
+  for(let i=1; i<this.tail.length; i++){
+    ctx.strokeStyle = "rgba(20,20,20,0.65)";
+    ctx.beginPath(); ctx.moveTo(this.tail[i-1].x, this.tail[i-1].y); ctx.lineTo(this.tail[i].x, this.tail[i].y); ctx.stroke();
+
+    if(i % 3 === 0){
+      ctx.fillStyle = (i % 6 === 0) ? "#ff3030" : "#ffffff";
+      ctx.beginPath(); ctx.arc(this.tail[i].x, this.tail[i].y, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.4)"; ctx.lineWidth = 0.8;
+      ctx.stroke();
+      ctx.lineWidth = 2.5;
+    }
+  }
+
+  ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle + Math.PI / 2);
+  if (this.sprite.complete && this.sprite.naturalWidth !== 0) {
+    if(this.cortada) ctx.globalAlpha = 0.6;
+    ctx.drawImage(this.sprite, -this.width/2, -this.height/2, this.width, this.height);
+  } else {
+    ctx.fillStyle = this.cortada ? "#999" : "#ff3030";
+    ctx.beginPath(); ctx.moveTo(0, -this.height/2); ctx.lineTo(this.width/2, 0); ctx.lineTo(0, this.height/2); ctx.lineTo(-this.width/2, 0); ctx.closePath(); ctx.fill();
+  }
+
+  if (!this.cortada && this.avatarImg && this.avatarImg.complete) {
+      const baseAvatarSize = 28.8;
+      const avatarSize = this.isLarge ? baseAvatarSize * 1.5 : baseAvatarSize;
+      ctx.save(); ctx.beginPath(); ctx.arc(0, 0, avatarSize / 2, 0, Math.PI * 2); ctx.clip();
+      ctx.drawImage(this.avatarImg, -avatarSize / 2, -avatarSize / 2, avatarSize, avatarSize); ctx.restore();
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, avatarSize / 2, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+
+  if(!this.cortada) {
+    ctx.fillStyle = "#222"; ctx.fillRect(this.x - 16, this.y - 28, 32, 4);
+    ctx.fillStyle = this.hp > 40 ? "#00ff00" : "#ff0000";
+    ctx.fillRect(this.x - 16, this.y - 28, (this.hp / 100) * 32, 4);
+  }
+ }
+}
+
+function handleNewPipa(userName, avatarUrl = null, isLarge = false, spawnMultiplier = 1.0, spawnLineColor = "#ffffff", spawnGlow = false) {
+    if (pipas.some(p => p.nome === userName) || waitingQueue.some(w => w.nome === userName)) return;
+
+    if (!winStats[userName]) {
+        winStats[userName] = { cuts: 0, avatar: avatarUrl };
+    } else {
+        if(avatarUrl) winStats[userName].avatar = avatarUrl;
+    }
+
+    const novaPipa = new Pipa(userName, avatarUrl, isLarge, spawnMultiplier, spawnLineColor, spawnGlow);
+    if (pipas.length < 50) { pipas.push(novaPipa); } else { waitingQueue.push(novaPipa); }
+
+    updateWinRankingUI();
+}
+
+function playerSelfSpawn() { 
+    const n = document.getElementById('player-name').value.trim(); 
+    if (n) handleNewPipa(n, "https://www.tiktok.com/favicon.ico", false, 1.0, "#ffffff", false); 
+}
+
+function toggleModal() { 
+    const m = document.getElementById('configModal'); 
+    m.style.display = (m.style.display === 'block') ? 'none' : 'block'; 
+    renderEvents(); 
+}
+
+function toggleFestModal() {
+    const m = document.getElementById('festModal');
+    m.style.display = (m.style.display === 'block') ? 'none' : 'block';
+}
+
+function syncGiftInput() {
+    const sel = document.getElementById('giftSelector').value;
+    if(sel && sel !== "CUSTOM") document.getElementById('cmdInput').value = sel;
+    else if(sel === "CUSTOM") document.getElementById('cmdInput').value = "";
+}
+
+function saveLikeConfig() {
+    likeThreshold = parseInt(document.getElementById('likeThresholdInput').value) || 10;
+    localStorage.setItem('pipa_like_threshold', likeThreshold);
+    eventMappings["curtida_like"] = document.getElementById('likeActionSelect').value;
+    localStorage.setItem('pipa_events', JSON.stringify(eventMappings));
+    renderEvents();
+}
+
+function saveMemberConfig() {
+    eventMappings["member"] = document.getElementById('memberActionSelect').value;
+    localStorage.setItem('pipa_events', JSON.stringify(eventMappings));
+    renderEvents();
+}
+
+function saveShareConfig() {
+    eventMappings["compartilhar"] = document.getElementById('shareActionSelect').value;
+    localStorage.setItem('pipa_events', JSON.stringify(eventMappings));
+    renderEvents();
+}
+
+function addEvent() { 
+    const cmd = document.getElementById('cmdInput').value.trim().toLowerCase(); 
+    const act = document.getElementById('actionSelect').value; 
+    if(cmd) { 
+        eventMappings[cmd] = act; 
+        localStorage.setItem('pipa_events', JSON.stringify(eventMappings)); 
+        renderEvents(); 
+    } 
+}
+
+function removeEvent(cmd) { 
+    delete eventMappings[cmd]; 
+    localStorage.setItem('pipa_events', JSON.stringify(eventMappings)); 
+    renderEvents(); 
+}
+
+function renderEvents() { 
+    document.getElementById('event-list').innerHTML = Object.entries(eventMappings).map(([cmd, act]) => {
+        return `
+            <div class="event-item">
+                <span><strong>${cmd}</strong> &rarr; ${act}</span>
+                <div class="event-actions-group">
+                    <button class="btn-test" onclick="testTrigger('${cmd}')">Testar</button>
+                    <button class="btn-del" onclick="removeEvent('${cmd}')">&times;</button>
+                </div>
+            </div>
+        `;
+    }).join(''); 
+}
+
+function executeAction(action, user, avatar) {
+    if (action === "SPAWN_RANDOM") {
+        handleNewPipa(user, avatar, false, 1.0, "#ffffff", false);
+    } else if (action === "SPAWN_LARGE") {
+        handleNewPipa(user, avatar, true, 1.0, "#ffffff", false);
+    } else if (action === "SPAWN_CEROL") {
+        handleNewPipa(user, avatar, false, 5.0, "#ff66cc", true);
+    } else if (action === "SPAWN_LARGE_CEROL") {
+        handleNewPipa(user, avatar, true, 5.0, "#ff66cc", true);
+    } else if (action === "SPAWN_CEROL_FINO") {
+        handleNewPipa(user, avatar, false, 10.0, "#66ff66", true);
+    } else if (action === "SPAWN_LARGE_CEROL_FINO") {
+        handleNewPipa(user, avatar, true, 10.0, "#66ff66", true);
+    } else if (action === "SPAWN_CHILENA") {
+        handleNewPipa(user, avatar, false, 15.0, "#ffff66", true);
+    } else if (action === "SPAWN_LARGE_CHILENA") {
+        handleNewPipa(user, avatar, true, 15.0, "#ffff66", true);
+    } else {
+        const p = pipas.find(pipe => pipe.nome === user);
+        if (p && !p.cortada) {
+            if (action === "CEROL") {
+                p.hp = Math.min(100, p.hp + 50); p.damageMultiplier = 5.0; p.lineColor = "#ff66cc"; p.glowActive = true;
+                setTimeout(() => { p.damageMultiplier = 1.0; p.lineColor = "#ffffff"; p.glowActive = false; }, 10000);
+            } else if (action === "CEROL_FINO") {
+                p.hp = Math.min(100, p.hp + 50); p.damageMultiplier = 10.0; p.lineColor = "#66ff66"; p.glowActive = true;
+                setTimeout(() => { p.damageMultiplier = 1.0; p.lineColor = "#ffffff"; p.glowActive = false; }, 10000);
+            } else if (action === "CHILENA") {
+                p.hp = Math.min(100, p.hp + 50); p.damageMultiplier = 15.0; p.lineColor = "#ffff66"; p.glowActive = true;
+                setTimeout(() => { p.damageMultiplier = 1.0; p.lineColor = "#ffffff"; p.glowActive = false; }, 10000);
+            }
+            else if (action === "CURA_15") p.hp = Math.min(100, p.hp + 15);
+            else if (action === "CURA_50") p.hp = Math.min(100, p.hp + 50);
+            else if (action === "CURA_100") p.hp = 100;
+        }
+    }
+    updateWinRankingUI();
+}
+
+function testTrigger(key) {
+    const action = eventMappings[key];
+    if (!action) return;
+    
+    let testUser = "TESTE_LIVE";
+    if(key === "curtida_like") testUser = "LIKES_TEST";
+    if(key === "member") testUser = "MEMBRO_TEST";
+    if(key === "compartilhar") testUser = "SHARE_TEST";
+    
+    if(action.startsWith("SPAWN_")) {
+        pipas = pipas.filter(p => p.nome !== testUser);
+        waitingQueue = waitingQueue.filter(w => w.nome !== testUser);
+        executeAction(action, testUser, "https://www.tiktok.com/favicon.ico");
+    } else {
+        let p = pipas.find(pipe => pipe.nome === testUser);
+        if(!p) handleNewPipa(testUser, "https://www.tiktok.com/favicon.ico", false, 1.0, "#ffffff", false);
+        setTimeout(() => { executeAction(action, testUser, "https://www.tiktok.com/favicon.ico"); }, 150);
+    }
+}
+
+function connectTikFinity() {
+    const socket = new WebSocket('ws://localhost:21213/');
+    socket.onopen = () => { const d = document.getElementById('connDot'); if (d) d.classList.add('online'); };
+    socket.onmessage = (event) => {
+        const res = JSON.parse(event.data);
+        const d = res.data || res;
+        if (!d) return;
+        
+        let user = d.nickname || d.uniqueId || "Jogador";
+        let avatar = d.profilePictureUrl || d.profilePicUrl || d.avatar || null;
+        
+        const ev = (res.event || "").toLowerCase();
+        
+        if (ev === "gift") {
+            const giftId = String(d.giftId || "");
+            const giftName = String(d.giftName || "").toLowerCase().trim();
+            if (eventMappings[giftId]) { executeAction(eventMappings[giftId], user, avatar); } 
+            else if (eventMappings[giftName]) { executeAction(eventMappings[giftName], user, avatar); }
+            return; 
+        }
+        
+        let triggerKey = "";
+        let count = 1;
+
+        if (ev === "chat") triggerKey = (d.comment || "").toLowerCase().trim();
+        else if (ev === "command") triggerKey = (d.command || "").toLowerCase();
+        else if (ev === "share") triggerKey = "compartilhar";
+        else if (ev === "like") { 
+            triggerKey = "curtida_like"; 
+            count = parseInt(d.likeCount) || 1; 
+        }
+        else triggerKey = ev;
+
+        if (!triggerKey) return;
+
+        const action = eventMappings[triggerKey];
+        if (action) {
+            if (triggerKey === "curtida_like") {
+                if (likeCooldown) return;
+                likeCounter += count;
+                if (likeCounter >= likeThreshold) {
+                    likeCooldown = true;
+                    executeAction(action, user, avatar);
+                    setTimeout(() => { 
+                        likeCooldown = false; 
+                        likeCounter = 0; 
+                    }, 2000);
+                }
+            } else {
+                executeAction(action, user, avatar);
+            }
+        }
+    };
+    socket.onclose = () => { const d = document.getElementById('connDot'); if (d) d.classList.remove('online'); setTimeout(connectTikFinity, 5000); };
+}
+
+function loop(){
+ if (imgBackground.complete && imgBackground.naturalWidth !== 0) {
+    ctx.drawImage(imgBackground, 0, 0, canvas.width, canvas.height);
+ } else {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+ }
+
+ for(const p of pipas) p.update();
+
+ for(let i=0; i<pipas.length; i++){
+  for(let j=i+1; j<pipas.length; j++){
+   const a = pipas[i], b = pipas[j];
+   if(a.cortada || b.cortada) continue;
+
+   const pontoEncontro = getIntersectionPoint(a.anchorX, a.x, a.anchorY, a.y, b.anchorX, b.x, b.anchorY, b.y);
+   if(pontoEncontro){
+      if (festivalAtivo && festivalEstado === "prep") {
+          if (Math.random() < 0.2 && particulas.length < MAX_PARTICULAS) particulas.push(new Particula(pontoEncontro.x, pontoEncontro.y));
+          continue; 
+      }
+
+      a.hp -= 0.25 * b.damageMultiplier * damageGlobalMultiplier;
+      b.hp -= 0.25 * a.damageMultiplier * damageGlobalMultiplier;
+
+      if (particulas.length < MAX_PARTICULAS) {
+        const toAdd = Math.min(3, MAX_PARTICULAS - particulas.length);
+        for(let k = 0; k < toAdd; k++) particulas.push(new Particula(pontoEncontro.x, pontoEncontro.y));
+      }
+      
+      if(a.hp <= 0 && !a.cortada){
+         a.cortada = true; b.hp = Math.min(100, b.hp + 5);
+         if(!winStats[b.nome]) winStats[b.nome] = { cuts: 0, avatar: b.avatarUrl };
+         winStats[b.nome].cuts++;
+         scheduleSaveStats();
+         scheduleRankingUpdate();
+         falarTexto(`${b.nome} cortou ${a.nome}`);
+      }
+      if(b.hp <= 0 && !b.cortada){
+         b.cortada = true; a.hp = Math.min(100, a.hp + 5);
+         if(!winStats[a.nome]) winStats[a.nome] = { cuts: 0, avatar: a.avatarUrl };
+         winStats[a.nome].cuts++;
+         scheduleSaveStats();
+         scheduleRankingUpdate();
+         falarTexto(`${a.nome} cortou ${b.nome}`);
+      }
+   }
+  }
+ }
+
+ for (let i = particulas.length - 1; i >= 0; i--) {
+   particulas[i].update(); particulas[i].draw();
+   if (particulas[i].alpha <= 0) particulas.splice(i, 1);
+ }
+
+ for(const p of pipas) p.draw();
+
+ for(let i = pipas.length - 1; i >= 0; i--) {
+    if(pipas[i].dead) {
+        pipas.splice(i, 1);
+        if(waitingQueue.length > 0) pipas.push(waitingQueue.shift());
+    }
+ }
+ requestAnimationFrame(loop);
+}
+
+updateWinRankingUI();
+connectTikFinity();
+loop();
+
+/* ============================================================
+   INTEGRAÇÃO COM O PAINEL StreamToEarn — postMessage API
+   O painel envia: { type: "PIPA_ACTION", action: "SPAWN_RANDOM", user: "...", avatar: "..." }
+   ============================================================ */
+window.addEventListener("message", function(evt) {
+  if (!evt.data || evt.data.type !== "PIPA_ACTION") return;
+  const { action, user, avatar } = evt.data;
+  if (!action) return;
+  const safeUser   = user   || "Painel";
+  const safeAvatar = avatar || "https://www.tiktok.com/favicon.ico";
+  executeAction(action, safeUser, safeAvatar);
+});
+
+// Avisar o painel que o jogo está pronto
+if (window.opener) {
+  window.opener.postMessage({ type: "PIPA_READY" }, "*");
+}
+</script>
+</body>
+</html>

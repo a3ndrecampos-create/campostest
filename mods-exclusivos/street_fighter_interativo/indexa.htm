@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8">
+    <title>Street Fighter Alpha - Web</title>
+    <link rel="StyleSheet" type="text/css" href="css/sfa.css" />
+    <style>
+        /* Informações de debug do motor (velocidade de jogo, teclas de frame-a-frame,
+           estado Running/Paused, "Graphics/Audio loading") não fazem parte da
+           experiência final — ficam escondidas, mas continuam no DOM normalmente
+           (o motor pode seguir atualizando o texto delas sem problema nenhum). */
+        #pnlStatus, #pnlDebugInfo, div.loading { display:none !important; }
+    </style>
+</head>
+<body>
+    <div id="pnlStage" class="stage" style="width:768px;">
+        <script type="text/javascript">
+            function OnStageImagesLoaded() {}
+        </script>
+        <!-- OTIMIZAÇÃO v3: o modal de Quick Match (escolha de times/estágio) foi
+             removido por completo. O jogo agora só faz CPU vs CPU automático. -->
+        <div id="pnlDimBackground" class="dimBackground" style="display:none">&nbsp;</div>
+        <div id="pnlLoadingProgress" class="loadingBackground" style="display:none"></div>
+        <img onload="OnStageImagesLoaded()" id="bg0" style="left:0px" />
+        <img onload="OnStageImagesLoaded()" id="bg1" style="left:0px" />
+        <!--<div class="time"></div>-->
+        <!--<div class="overlay"></div>-->
+        <div id="pnlTeam1" class="team team1" style="display:none">
+            <div id="pnlHealthbarTeam1" class="health-bar"></div>
+            <div id="portriatTeam1" class="portriat"></div>
+            <div id="nameTeam1" class="name"></div>
+        </div>
+        <div id="pnlEnergyBarTeam1Container" class="team1-energy-bar-container">
+            <div id="pnlEnergyBarTeam1" class="energy-bar"></div>
+        </div>
+        <div id="pnlTeam2" class="team team2" style="display:none">
+            <div id="pnlHealthbarTeam2" class="health-bar"></div>
+            <div id="portriatTeam2" class="portriat"></div>
+            <div id="nameTeam2" class="name"></div>
+        </div>
+        <div id="pnlEnergyBarTeam2Container" class="team2-energy-bar-container">
+            <div id="pnlEnergyBarTeam2" class="energy-bar"></div>
+        </div>
+        <div id="pnlText" class="Text"></div>
+        <div id="pnlTeam1ComboText" class="Text"></div>
+        <div id="pnlTeam1NbHitsText" class="Text"></div>
+        <div id="pnlTeam2ComboText" class="Text"></div>
+        <div id="pnlTeam2NbHitsText" class="Text"></div>
+        <div class="Announce">
+            <span style="display:none;" id="pnlFight" class="Fight">&nbsp;</span>
+            <br />
+            <span style="display:none;" id="pnlRoundNumber" class="RoundNumber">&nbsp;</span>
+            <br />
+            <span style="display:none;" id="pnlRound" class="Round">&nbsp;</span>
+            <br />
+            <span style="display:none;" id="pnlPerfect" class="Perfect">&nbsp;</span>
+            <br />
+            <span style="display:none;" id="pnlKO" class="KO">&nbsp;</span>
+        </div>
+        <div class="superComboFinish" id="pnlSuperComboFinish" style="display:none;">&nbsp;</div>
+    </div>
+    <div id="pnlStatus">
+        <br /><span class="frame-rate">Game speed: <span id="spnSpeed">?</span>/100</span>
+        <br />
+        <br /><u class="game-speed">Press:</u>
+        <br /><span class="step-frame">[8] increase game speed</span>
+        <br /><span class="step-frame">[9] decrease game speed</span>
+        <br /><span class="step-frame">[0] reset game speed</span>
+        <br /><span id="spnStepFrame" class="step-frame">[O] for next frame</span>
+        <br /><span id="spnResume" class="resume">[P] to resume</span>
+        <br />
+    </div>
+    <div id="pnlDebugInfo">
+        <br /><span id="spnMsg"></span>
+        <br /><span id="spnState" class="state running">State: <span>Running</span></span>
+    </div>
+    <div class="loading">Graphics loading (<span id="pnlLoading" class="loading">done</span>)</div>
+    <div class="loading">Audio loading (<span id="pnlAudio" class="loading">done</span>)</div>
+    <div id="pnlTeam1Keys" class="team1Keys"></div>
+    <div id="pnlTeam2Keys" class="team2Keys"></div>
+    <!--
+    <div id="pnlAnimationDebug" class="animation-debug">
+        <input type="button" onclick="debug_.p1ReverseFrame();" value="<<"/>
+        <input type="button" onclick="debug_.p1StepFrame();" value=">>"/>
+        <br />#: <span id="spnIndex"></span>
+        <br />X: <input id="txtX" />
+        <br />Y: <input id="txtY" />
+        <br />S: <input id="txtShadow" />
+        <br />Sx:<input id="txtShadowOffsetX" />
+        <br />Sy:<input id="txtShadowOffsetY" />
+        <input type="button" onclick="debug_.setFrameData()" value="Set"/>
+    </div>
+    -->
+    <div class="start-game-container">
+        <a title="Jogar!" href="javascript:;" onclick="startUpGame()"><img src="assets/capa.png" /></a>
+    </div>
+    <script type="text/javascript">
+        var __debugMode = false;
+        var __noDamage = false;
+        var __noFallDamage = false;
+
+        /*
+        if(!__debugMode)
+        {
+            window.document.getElementById("pnlAnimationDebug").style.display = "none";
+            window.document.getElementById("pnlStatus").style.display = "";
+            window.document.getElementById("cmdGo").style.display = "none";
+        }
+        else
+        {
+            window.document.getElementById("pnlAnimationDebug").style.display = "";
+            window.document.getElementById("pnlStatus").style.display = "";
+            window.document.getElementById("cmdGo").style.display = "";
+        }
+        */
+    </script>
+    <script type="text/javascript" src="script/joypad.min.js"></script>
+    <script type="text/javascript" src="script/browserDetect.js"></script>
+    <script type="text/javascript" src="script/values.js"></script>
+    <script type="text/javascript" src="script/flags.js"></script>
+    <script type="text/javascript" src="script/user.js"></script>
+    <script type="text/javascript" src="script/vcr.js"></script>
+    <script type="text/javascript" src="script/fonts.js"></script>
+    <script type="text/javascript" src="script/stuff-loader.js"></script>
+    <script type="text/javascript" src="script/base64-binary.js"></script>
+    <script type="text/javascript" src="script/webAudioManager.js"></script>
+    <script type="text/javascript" src="script/soundmanager.js"></script>
+    <script type="text/javascript" src="script/fontsystem.js"></script>
+    <script type="text/javascript" src="script/animation-trial.js"></script>
+    <script type="text/javascript" src="script/char-select.js"></script>
+    <script type="text/javascript" src="script/game.js"></script>
+    <script type="text/javascript" src="script/energy-bar.js"></script>
+    <script type="text/javascript" src="script/health-bar.js"></script>
+    <script type="text/javascript" src="script/hitsystem.js"></script>
+    <script type="text/javascript" src="script/team.js"></script>
+    <script type="text/javascript" src="script/stage.js"></script>
+    <script type="text/javascript" src="script/announcer.js"></script>
+    <script type="text/javascript" src="script/faceoff.js"></script>
+    <script type="text/javascript" src="script/match.js"></script>
+    <script type="text/javascript" src="script/circle.js"></script>
+    <script type="text/javascript" src="script/cdHelper.js"></script>
+    <script type="text/javascript" src="script/animation.js"></script>
+    <script type="text/javascript" src="script/player-utils.js"></script>
+    <script type="text/javascript" src="script/player.js"></script>
+    <script type="text/javascript" src="script/player.sound.js"></script>
+    <script type="text/javascript" src="script/player.combat.js"></script>
+    <script type="text/javascript" src="script/player.animation.js"></script>
+    <script type="text/javascript" src="script/player.input.js"></script>
+    <script type="text/javascript" src="script/player.motion.js"></script>
+    <script type="text/javascript" src="script/player.debug.js"></script>
+    <script type="text/javascript" src="script/player-common.js"></script>
+    <script type="text/javascript" src="script/player.ai.js"></script>
+    <script type="text/javascript" src="script/generic-ai.js"></script>
+    <script type="text/javascript" src="script/ai-proxy.js"></script>
+    <script type="text/javascript" src="script/debug.js"></script>
+    <script type="text/javascript" src="script/load-spritedata.js"></script>
+    <script type="text/javascript" src="script/player-ryu.js"></script>
+    <script type="text/javascript" src="script/ryu-ai.js"></script>
+    <script type="text/javascript" src="script/player-ryu-spritedata.js"></script>
+    <script type="text/javascript" src="script/player-ryu2-spritedata.js"></script>
+    <script type="text/javascript" src="script/player-ken.js"></script>
+    <script type="text/javascript" src="script/ken-ai.js"></script>
+    <script type="text/javascript" src="script/player-ken-spritedata.js"></script>
+    <script type="text/javascript" src="script/player-ken2-spritedata.js"></script>
+    <script type="text/javascript" src="script/player-sagat.js"></script>
+    <script type="text/javascript" src="script/player-sagat-spritedata.js"></script>
+    <script type="text/javascript" src="script/player-sagat2-spritedata.js"></script>
+    <script type="text/javascript" src="script/sagat-ai.js"></script>
+    <script type="text/javascript" src="script/player-mbison.js"></script>
+    <script type="text/javascript" src="script/mbison-ai.js"></script>
+    <script type="text/javascript" src="script/player-mbison-spritedata.js"></script>
+    <script type="text/javascript" src="script/player-mbison2-spritedata.js"></script>
+    <script type="text/javascript" src="script/player-akuma.js"></script>
+    <script type="text/javascript" src="script/akuma-ai.js"></script>
+    <script type="text/javascript" src="script/player-akuma-spritedata.js"></script>
+    <script type="text/javascript" src="script/player-akuma2-spritedata.js"></script>
+    <script type="text/javascript" src="script/init.js"></script>
+    <!-- <script type="text/javascript" src="script/audio/guy-theme.ogg.js"></script>
+    <script type="text/javascript" src="script/audio/ryu-theme.ogg.js"></script>
+    <script type="text/javascript" src="script/audio/ken-theme.ogg.js"></script>
+    <script type="text/javascript" src="script/audio/chunli-theme.ogg.js"></script>
+    <script type="text/javascript" src="script/audio/mbison-theme.ogg.js"></script>
+    <script type="text/javascript" src="script/audio/sagat-theme.ogg.js"></script>
+    <script type="text/javascript" src="script/audio/sodom-theme.ogg.js"></script>
+    <script type="text/javascript" src="script/audio/akuma-theme.ogg.js"></script> -->
+
+
+    <audio id="myaudio">
+    HTML5 audio not supported
+    </audio>
+    <script src="ai-mod.js"></script>
+
+    <!-- ============================================================
+         PAINEL DE CONFIGURAÇÃO (embutido no mesmo HTML do jogo)
+         Abre/fecha como uma gaveta lateral ao clicar em "⚙️ Conf."
+         na barra de ações (criada pelo ai-mod.js, embaixo da fila).
+         Continua conversando com o jogo pelo mesmo BroadcastChannel
+         'cpu_vs_cpu_panel' que o ai-mod.js já escuta — só que agora
+         os dois lados vivem na mesma aba/documento.
+         ============================================================ -->
+    <div id="pnlConfigBackdrop" onclick="togglePainelConfig(false)"></div>
+    <div id="pnlConfigPanel">
+    <style>
+        #pnlConfigPanel {
+            --bg0:#07080d; --bg1:#0d0e16; --bg2:#12131e; --bg3:#191a27;
+            --border:#1e2030; --border2:#272838;
+            --text:#e2e4f0; --muted:#5a5d7a; --label:#8890b0;
+            --gold:#f5c518; --gold-dim:rgba(245,197,24,.15);
+            --green:#1db954; --blue:#2563eb; --cyan:#00e5cc;
+            --red:#e8312a; --purple:#7c3aed;
+
+            position:fixed; top:0; right:0; height:100vh; width:420px; max-width:94vw;
+            background:var(--bg0); color:var(--text);
+            font-family:'Inter','Segoe UI',Arial,sans-serif; font-size:11px;
+            z-index:200000; display:flex; flex-direction:column;
+            box-shadow:-10px 0 30px rgba(0,0,0,.6);
+            transform:translateX(105%); transition:transform .28s cubic-bezier(.4,0,.2,1);
+        }
+        #pnlConfigPanel.open { transform:translateX(0); }
+        #pnlConfigBackdrop {
+            position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:199999;
+            opacity:0; pointer-events:none; transition:opacity .2s;
+        }
+        #pnlConfigBackdrop.open { opacity:1; pointer-events:auto; }
+
+        #pnlConfigPanel *, #pnlConfigPanel *::before, #pnlConfigPanel *::after { box-sizing:border-box; }
+        #pnlConfigPanel * { scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
+
+        #pcHeader { display:flex; align-items:center; justify-content:space-between; padding:12px 14px 0; flex-shrink:0; }
+        #pcHeader h1 { font-size:13px; font-weight:700; color:var(--gold); letter-spacing:1.5px; text-transform:uppercase; margin:0; }
+        #pcHeader h1 span { color:var(--text); opacity:.5; }
+        #pcClose { padding:5px 10px; background:transparent; border:1.5px solid var(--border2); color:var(--muted); font-size:14px; font-weight:700; border-radius:5px; cursor:pointer; transition:.15s; line-height:1; }
+        #pcClose:hover { border-color:var(--red); color:var(--red); }
+
+        #pcStatusBar { display:flex; align-items:center; justify-content:space-between; margin:10px 14px 0; background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:6px 10px; flex-shrink:0; flex-wrap:wrap; gap:6px; }
+        #pnlConfigPanel .status-item { display:flex; align-items:center; gap:5px; font-size:9px; font-weight:600; letter-spacing:.8px; color:var(--label); text-transform:uppercase; }
+        #pnlConfigPanel .dot { width:7px; height:7px; border-radius:50%; background:var(--border2); flex-shrink:0; transition:background .3s, box-shadow .3s; }
+        #pnlConfigPanel .dot.on-game { background:var(--green); box-shadow:0 0 6px var(--green); }
+        #pnlConfigPanel .dot.on-tikf { background:var(--blue); box-shadow:0 0 6px var(--blue); }
+        #pnlConfigPanel .dot.on-live { background:var(--gold); box-shadow:0 0 6px var(--gold); }
+        #pcGameStats { font-size:9px; color:var(--muted); }
+        #pcGameStats span { color:var(--cyan); font-weight:700; }
+
+        #pcLayout { flex:1; display:flex; flex-direction:column; gap:8px; padding:10px 14px 16px; min-height:0; overflow-y:auto; }
+        #pnlConfigPanel .section { background:var(--bg1); border:1px solid var(--border); border-radius:8px; padding:9px 11px; display:flex; flex-direction:column; gap:6px; }
+        #pnlConfigPanel .s-title { font-size:9px; color:var(--gold); text-transform:uppercase; font-weight:700; letter-spacing:1.2px; padding-bottom:5px; border-bottom:1px solid var(--border); }
+
+        #pnlConfigPanel .team-bar-row { display:flex; flex-direction:column; gap:2px; }
+        #pnlConfigPanel .team-bar-label { display:flex; justify-content:space-between; font-size:9px; color:var(--label); }
+        #pnlConfigPanel .team-bar-label strong { color:var(--text); }
+        #pnlConfigPanel .mini-track { height:5px; border-radius:3px; background:var(--bg0); border:1px solid var(--border2); overflow:hidden; margin-bottom:2px; }
+        #pnlConfigPanel .mini-fill { height:100%; border-radius:3px; transition:width .3s; }
+        #pnlConfigPanel .mini-fill.health { background:linear-gradient(90deg,#1db954,#f5c518); }
+        #pnlConfigPanel .mini-fill.energy { background:linear-gradient(90deg,var(--blue),var(--purple)); }
+
+        #pnlConfigPanel .btn { padding:6px 8px; border:none; color:#fff; cursor:pointer; font-weight:700; border-radius:5px; font-size:10px; transition:filter .15s; white-space:nowrap; }
+        #pnlConfigPanel .btn:hover { filter:brightness(1.15); }
+        #pnlConfigPanel .btn:active { filter:brightness(.9); }
+        #pnlConfigPanel .btn-red { background:var(--red); }
+        #pnlConfigPanel .btn-green { background:var(--green); }
+        #pnlConfigPanel .btn-blue { background:var(--blue); }
+        #pnlConfigPanel .btn-purple { background:var(--purple); }
+        #pnlConfigPanel .btn-gold { background:var(--gold); color:#000; }
+        #pnlConfigPanel .btn-gray { background:var(--bg3); border:1px solid var(--border2); }
+        #pnlConfigPanel .row { display:flex; gap:6px; }
+        #pnlConfigPanel .row > * { flex:1; }
+        #pnlConfigPanel .btn-test { background:transparent; color:var(--green); border:1px solid var(--green); padding:3px 7px; border-radius:4px; cursor:pointer; font-size:9px; font-weight:700; transition:background .15s; }
+        #pnlConfigPanel .btn-test:hover { background:rgba(29,185,84,.15); }
+        #pnlConfigPanel .btn-del { color:var(--muted); cursor:pointer; background:transparent; border:none; padding:0 3px; font-size:14px; line-height:1; transition:color .15s; }
+        #pnlConfigPanel .btn-del:hover { color:var(--red); }
+
+        #pnlConfigPanel .inp, #pnlConfigPanel .sel { padding:5px 7px; background:var(--bg0); color:var(--text); border:1px solid var(--border2); border-radius:5px; font-size:10px; font-family:inherit; outline:none; transition:border-color .15s; }
+        #pnlConfigPanel .inp:focus, #pnlConfigPanel .sel:focus { border-color:var(--gold); }
+        #pnlConfigPanel .sel { height:28px; }
+        #pnlConfigPanel .inp::placeholder { color:var(--muted); }
+
+        #pnlConfigPanel .event-list { max-height:110px; overflow-y:auto; background:var(--bg0); border:1px solid var(--border); border-radius:5px; }
+        #pnlConfigPanel .event-item { display:flex; justify-content:space-between; align-items:center; padding:4px 7px; font-size:9.5px; border-bottom:1px solid var(--border); gap:4px; }
+        #pnlConfigPanel .event-item:last-child { border-bottom:none; }
+        #pnlConfigPanel .event-label { flex:1; min-width:0; }
+        #pnlConfigPanel .event-label strong { color:var(--cyan); }
+        #pnlConfigPanel .event-actions { display:flex; gap:4px; align-items:center; flex-shrink:0; }
+        #pnlConfigPanel .sub-label { font-size:8px; color:var(--muted); text-transform:uppercase; font-weight:700; letter-spacing:.8px; margin-top:6px; padding-top:5px; border-top:1px solid var(--border); }
+    </style>
+
+    <div id="pcHeader">
+        <h1>🥊 CPU vs CPU <span>— Painel</span></h1>
+        <button id="pcClose" onclick="togglePainelConfig(false)">✕</button>
+    </div>
+
+    <div id="pcStatusBar">
+        <div class="status-item"><div id="dotGame" class="dot"></div> Jogo</div>
+        <div class="status-item"><div id="dotTikf" class="dot"></div> TikFinity</div>
+        <div class="status-item"><div id="dotLive" class="dot"></div> Luta</div>
+        <div id="pcGameStats">🟥 <span id="st1">--</span> &nbsp;vs&nbsp; 🟦 <span id="st2">--</span> &nbsp;|&nbsp; 🕓 Fila: <span id="stQ">0</span></div>
+    </div>
+
+    <div id="pcLayout">
+
+        <!-- STATUS DA LUTA -->
+        <div class="section">
+            <div class="s-title">📊 Luta Atual</div>
+            <div class="team-bar-row">
+                <div class="team-bar-label"><strong id="t1name">Time 1</strong><span id="t1hp">--</span></div>
+                <div class="mini-track"><div id="t1hbar" class="mini-fill health" style="width:0%"></div></div>
+                <div class="mini-track"><div id="t1ebar" class="mini-fill energy" style="width:0%"></div></div>
+            </div>
+            <div class="team-bar-row">
+                <div class="team-bar-label"><strong id="t2name">Time 2</strong><span id="t2hp">--</span></div>
+                <div class="mini-track"><div id="t2hbar" class="mini-fill health" style="width:0%"></div></div>
+                <div class="mini-track"><div id="t2ebar" class="mini-fill energy" style="width:0%"></div></div>
+            </div>
+        </div>
+
+        <!-- SPAWNAR -->
+        <div class="section">
+            <div class="s-title">⚔️ Spawnar</div>
+            <button class="btn btn-red" onclick="send({type:'EXECUTE_ACTION',action:'SPAWN_RANDOM'})">🎲 Sortear luta</button>
+        </div>
+
+        <!-- ARENA -->
+        <div class="section">
+            <div class="s-title">🏟️ Arena</div>
+            <select id="arenaSel" class="sel" onchange="setArena()"></select>
+            <div style="font-size:9px;color:var(--muted);">Escolhida aqui, essa arena é usada em toda luta nova (fim de round, fila, "Nova luta") até você trocar de novo ou voltar pra aleatória.</div>
+        </div>
+
+        <!-- AÇÕES RÁPIDAS MANUAIS (operador) -->
+        <div class="section">
+            <div class="s-title">🕹️ Admin</div>
+            <div class="row">
+                <button class="btn btn-green" onclick="send({type:'EXECUTE_ACTION',action:'RESTAURAR_SANGUE_100',user:currentT1User()})">❤ T1</button>
+                <button class="btn btn-green" onclick="send({type:'EXECUTE_ACTION',action:'RESTAURAR_SANGUE_100',user:currentT2User()})">❤ T2</button>
+            </div>
+            <div class="row" style="margin-top:4px;">
+                <button class="btn btn-purple" onclick="send({type:'EXECUTE_ACTION',action:'RECARREGA_ESPECIAL_100',user:currentT1User()})">⚡ T1</button>
+                <button class="btn btn-purple" onclick="send({type:'EXECUTE_ACTION',action:'RECARREGA_ESPECIAL_100',user:currentT2User()})">⚡ T2</button>
+            </div>
+        </div>
+
+        <!-- LIKES -->
+        <div class="section">
+            <div class="s-title">⚡ Likes</div>
+            <div class="row">
+                <label style="color:var(--label);white-space:nowrap;align-self:center;">A cada</label>
+                <input type="number" id="likeN" class="inp" style="width:44px;text-align:center;" min="1" value="20">
+                <label style="color:var(--label);white-space:nowrap;align-self:center;">likes →</label>
+            </div>
+            <select id="likeAct" class="sel"></select>
+            <div class="row">
+                <button class="btn btn-green" onclick="saveLike()">SALVAR</button>
+                <button class="btn-test" onclick="testKey('curtida_like')">Testar</button>
+            </div>
+        </div>
+
+        <!-- MEMBRO / SHARE -->
+        <div class="section">
+            <div class="s-title">👑 Membro / Share</div>
+            <select id="memberAct" class="sel"></select>
+            <div class="row">
+                <button class="btn btn-green" onclick="saveMember()">SALVAR membro</button>
+                <button class="btn-test" onclick="testKey('membro')">Testar</button>
+            </div>
+            <div class="sub-label">📤 Compartilhar</div>
+            <select id="shareAct" class="sel"></select>
+            <div class="row">
+                <button class="btn btn-green" onclick="saveShare()">SALVAR share</button>
+                <button class="btn-test" onclick="testKey('compartilhar')">Testar</button>
+            </div>
+        </div>
+
+        <!-- PRESENTES & COMANDOS -->
+        <div class="section">
+            <div class="s-title">🎁 Presentes & Comandos de Chat</div>
+
+            <div class="row">
+                <select id="giftSel" class="sel" style="flex:1;" onchange="syncGift()">
+                    <option value="">— Presente —</option>
+                    <option value="CUSTOM">— CHAT/COMANDO —</option>
+                    <option value="5655">Rose (5655)</option>
+                    <option value="6247">Heart (6247)</option>
+                    <option value="5760">Weights (5760)</option>
+                    <option value="6007">Boxing Gloves (6007)</option>
+                    <option value="6532">Dancing Cactus (6532)</option>
+                    <option value="6652">Lightning Bolt (6652)</option>
+                    <option value="6369">Lion (6369)</option>
+                    <option value="7823">Leon and Lion (7823)</option>
+                    <option value="8602">Gorilla (8602)</option>
+                    <option value="8814">Superhero Fight (8814)</option>
+                    <option value="9427">Pegasus (9427)</option>
+                    <option value="7610">Dragon Flame (7610)</option>
+                    <option value="7319">Phoenix (7319)</option>
+                    <option value="5930">Rocket (5930)</option>
+                    <option value="6103">Yacht (6103)</option>
+                    <option value="6089">Sports Car (6089)</option>
+                </select>
+            </div>
+
+            <div class="row">
+                <input type="text" id="cmdInput" placeholder="Código ou palavra" class="inp" style="flex:1;">
+                <select id="actionSel" class="sel" style="flex:1.5;"></select>
+            </div>
+
+            <div class="row">
+                <label style="color:var(--label);align-self:center;white-space:nowrap;">🔁</label>
+                <input type="number" id="repeatN" class="inp" value="1" min="1" max="10" style="width:40px;text-align:center;">
+                <button class="btn btn-red" onclick="addEvent()">ADD</button>
+            </div>
+
+            <div id="event-list" class="event-list"></div>
+
+            <div class="sub-label">🗑️ Zerar dados</div>
+            <div style="font-size:9px;color:var(--muted);">Limpa o ranking Top 3 e esvazia a fila de espera de seguidores. Não afeta os eventos/comandos configurados acima.</div>
+            <button class="btn btn-red" onclick="resetarRankingEFila()">🗑️ Resetar ranking e fila de espera</button>
+        </div>
+
+    </div>
+    </div>
+
+    <script>
+    // ============================================================
+    // ABRIR/FECHAR A GAVETA DO PAINEL
+    // ============================================================
+    function togglePainelConfig(force) {
+        var panel = document.getElementById('pnlConfigPanel');
+        var backdrop = document.getElementById('pnlConfigBackdrop');
+        var open = (typeof force === 'boolean') ? force : !panel.classList.contains('open');
+        panel.classList.toggle('open', open);
+        backdrop.classList.toggle('open', open);
+    }
+    window.togglePainelConfig = togglePainelConfig;
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') togglePainelConfig(false);
+    });
+
+    // ============================================================
+    // LISTA DE AÇÕES DISPONÍVEIS
+    // ============================================================
+    const ACTION_LABELS = {
+        JOIN_QUEUE_RANDOM:  "Entrar na fila (personagem aleatório)",
+        JOIN_QUEUE_RYU:     "Entrar na fila como Ryu",
+        JOIN_QUEUE_KEN:     "Entrar na fila como Ken",
+        JOIN_QUEUE_SAGAT:   "Entrar na fila como Sagat",
+        JOIN_QUEUE_MBISON:  "Entrar na fila como M. Bison",
+        JOIN_QUEUE_AKUMA:   "Entrar na fila como Akuma",
+
+        LUTA_AUTOMATICA:  "Luta automática (golpe fraco/médio aleatório)",
+        PODERES_ALEATORIO:"Poderes padrão aleatório do personagem",
+        COMBO_ESPECIAL:   "Combo de golpes e poderes (especial + super)",
+
+        RESTAURAR_SANGUE_10:  "Restaurar sangue 10%",
+        RESTAURAR_SANGUE_30:  "Restaurar sangue 30%",
+        RESTAURAR_SANGUE_50:  "Restaurar sangue 50%",
+        RESTAURAR_SANGUE_100: "Restaurar sangue 100%",
+
+        RECARREGA_ESPECIAL_10:  "Recarregar especial 10%",
+        RECARREGA_ESPECIAL_30:  "Recarregar especial 30%",
+        RECARREGA_ESPECIAL_50:  "Recarregar especial 50%",
+        RECARREGA_ESPECIAL_100: "Recarregar especial 100%"
+    };
+
+    const CHAR_IDS = { RYU:0, KEN:3, SAGAT:10, MBISON:14, AKUMA:13 };
+
+    // mesma lista (chave/label) de STAGE_INFO no ai-mod.js
+    const STAGE_INFO = [
+        {key:"guy",             label:"Beco (Guy)"},
+        {key:"ken",             label:"Aeroporto (Ken)"},
+        {key:"ryu",             label:"Templo (Ryu)"},
+        {key:"sodom",           label:"Clube (Sodom)"},
+        {key:"akuma",           label:"Caverna (Akuma)"},
+        {key:"sagat",           label:"Deserto (Sagat)"},
+        {key:"chunli",          label:"China (Chun-Li)"},
+        {key:"dramatic_battle", label:"Batalha Final"}
+    ];
+
+    function fillSelect(sel) {
+        sel.innerHTML = '<optgroup label="— Entrar na Fila —">' +
+            ['JOIN_QUEUE_RANDOM','JOIN_QUEUE_RYU','JOIN_QUEUE_KEN','JOIN_QUEUE_SAGAT','JOIN_QUEUE_MBISON','JOIN_QUEUE_AKUMA']
+            .map(k => `<option value="${k}">${ACTION_LABELS[k]}</option>`).join('') +
+            '</optgroup>' +
+            '<optgroup label="— Combate (só quem está lutando) —">' +
+            ['LUTA_AUTOMATICA','PODERES_ALEATORIO','COMBO_ESPECIAL']
+            .map(k => `<option value="${k}">${ACTION_LABELS[k]}</option>`).join('') +
+            '</optgroup>' +
+            '<optgroup label="— Restaurar Sangue (só quem está lutando) —">' +
+            ['RESTAURAR_SANGUE_10','RESTAURAR_SANGUE_30','RESTAURAR_SANGUE_50','RESTAURAR_SANGUE_100']
+            .map(k => `<option value="${k}">${ACTION_LABELS[k]}</option>`).join('') +
+            '</optgroup>' +
+            '<optgroup label="— Energia Especial (só quem está lutando) —">' +
+            ['RECARREGA_ESPECIAL_10','RECARREGA_ESPECIAL_30','RECARREGA_ESPECIAL_50','RECARREGA_ESPECIAL_100']
+            .map(k => `<option value="${k}">${ACTION_LABELS[k]}</option>`).join('') +
+            '</optgroup>';
+    }
+    ['likeAct','memberAct','shareAct','actionSel'].forEach(id => fillSelect(document.getElementById(id)));
+
+    const arenaSelEl = document.getElementById('arenaSel');
+    arenaSelEl.innerHTML = '<option value="">🎲 Aleatória (padrão)</option>' +
+        STAGE_INFO.map(s => `<option value="${s.key}">${s.label}</option>`).join('');
+
+    function setArena() {
+        send({ type:'EXECUTE_ACTION', action:'TROCAR_ARENA', stage: arenaSelEl.value });
+    }
+
+    // ============================================================
+    // RESETAR RANKING TOP 3 + FILA DE ESPERA
+    // ============================================================
+    function resetarRankingEFila() {
+        if (!confirm('Tem certeza que deseja resetar o ranking e esvaziar a fila de espera? Essa ação não pode ser desfeita.')) return;
+        send({ type:'EXECUTE_ACTION', action:'RESETAR_RANKING_FILA' });
+    }
+    window.resetarRankingEFila = resetarRankingEFila;
+
+    // ============================================================
+    // ARMAZENAMENTO SEGURO
+    // ============================================================
+    const S = (() => {
+        let mem = {};
+        let ok = false;
+        try { localStorage.setItem('__t__','1'); localStorage.removeItem('__t__'); ok=true; } catch(e){}
+        return {
+            get(k) { if(ok) try{ return localStorage.getItem(k); }catch(e){} return mem[k]??null; },
+            set(k,v) { if(ok) try{ localStorage.setItem(k,v); return; }catch(e){} mem[k]=String(v); }
+        };
+    })();
+
+    // ============================================================
+    // CANAL COM O JOGO (mesmo documento — dois objetos BroadcastChannel
+    // com o mesmo nome ainda trocam mensagem entre si normalmente,
+    // mesmo estando na mesma aba)
+    // ============================================================
+    const gameChannel = new BroadcastChannel('cpu_vs_cpu_panel');
+    let fighters = {team1: null, team2: null};
+
+    function currentT1User() { return fighters.team1 ? fighters.team1.user : ''; }
+    function currentT2User() { return fighters.team2 ? fighters.team2.user : ''; }
+
+    function pingGame() { gameChannel.postMessage({type:'PING'}); }
+    setInterval(pingGame, 3000);
+    pingGame();
+
+    let gameOnlineTimer = null;
+    function markOnline() {
+        document.getElementById('dotGame').className = 'dot on-game';
+        clearTimeout(gameOnlineTimer);
+        gameOnlineTimer = setTimeout(() => { document.getElementById('dotGame').className = 'dot'; }, 7000);
+    }
+
+    function pct(v, mx) { return mx > 0 ? Math.max(0, Math.min(100, v/mx*100)) : 0; }
+
+    gameChannel.onmessage = ev => {
+        const msg = ev.data;
+        if (!msg || !msg.type) return;
+        if (msg.type === 'PONG' || msg.type === 'READY') { markOnline(); return; }
+        if (msg.type === 'GAME_STATE') {
+            markOnline();
+            const s = msg.stats;
+            const liveDot = document.getElementById('dotLive');
+            if (!s || !s.playing) { liveDot.className = 'dot'; return; }
+            liveDot.className = 'dot on-live';
+            fighters.team1 = s.team1.fighter; fighters.team2 = s.team2.fighter;
+            document.getElementById('st1').textContent = s.team1.name;
+            document.getElementById('st2').textContent = s.team2.name;
+            document.getElementById('t1name').textContent = s.team1.name;
+            document.getElementById('t1hp').textContent   = `${Math.round(s.team1.health)}/${s.team1.healthMax}`;
+            document.getElementById('t1hbar').style.width = pct(s.team1.health, s.team1.healthMax)+'%';
+            document.getElementById('t1ebar').style.width = pct(s.team1.energy, 288)+'%';
+            document.getElementById('t2name').textContent = s.team2.name;
+            document.getElementById('t2hp').textContent   = `${Math.round(s.team2.health)}/${s.team2.healthMax}`;
+            document.getElementById('t2hbar').style.width = pct(s.team2.health, s.team2.healthMax)+'%';
+            document.getElementById('t2ebar').style.width = pct(s.team2.energy, 288)+'%';
+            return;
+        }
+        if (msg.type === 'QUEUE_STATE') {
+            document.getElementById('stQ').textContent = (msg.queue||[]).length;
+            if (typeof msg.forcedStage === 'string' && document.activeElement !== arenaSelEl)
+                arenaSelEl.value = msg.forcedStage;
+        }
+    };
+
+    function send(msg) { gameChannel.postMessage(msg); }
+
+    // ============================================================
+    // RESOLVE AÇÃO ANTES DE MANDAR PRO JOGO
+    // ============================================================
+    function resolveMsg(action, user, avatar) {
+        const msg = { type:'EXECUTE_ACTION', user, avatar };
+        if (action.startsWith('JOIN_QUEUE_')) {
+            const charKey = action.slice('JOIN_QUEUE_'.length);
+            msg.action = 'JOIN_QUEUE';
+            if (charKey !== 'RANDOM' && CHAR_IDS[charKey] !== undefined)
+                msg.character = CHAR_IDS[charKey];
+        } else {
+            msg.action = action;
+        }
+        return msg;
+    }
+
+    // ============================================================
+    // MAPEAMENTOS DE EVENTOS
+    // ============================================================
+    const LEGACY_ACTION_MAP = {
+        RECUPERA_SANGUE:    'RESTAURAR_SANGUE_100',
+        RECARREGA_ESPECIAL: 'RECARREGA_ESPECIAL_30',
+        PODER_FORTE:        'RECARREGA_ESPECIAL_100'
+    };
+
+    function loadMappings() {
+        try {
+            const r = JSON.parse(S.get('cpuvscpu_events'));
+            if (!r) return null;
+            const out = {};
+            for (const [k,v] of Object.entries(r)) {
+                const entry = typeof v === 'string' ? {action:v} : {...v};
+                if (LEGACY_ACTION_MAP[entry.action]) entry.action = LEGACY_ACTION_MAP[entry.action];
+                out[k] = entry;
+            }
+            return out;
+        } catch { return null; }
+    }
+
+    let mappings = loadMappings() || {
+        "membro":       { action:"JOIN_QUEUE_RANDOM" },
+        "compartilhar": { action:"RESTAURAR_SANGUE_30" },
+        "5655":         { action:"JOIN_QUEUE_RANDOM" },
+        "rose":         { action:"JOIN_QUEUE_RANDOM" },
+        "6369":         { action:"COMBO_ESPECIAL" },
+        "lion":         { action:"COMBO_ESPECIAL" },
+        "6652":         { action:"RECARREGA_ESPECIAL_100" },
+        "curtida_like": { action:"LUTA_AUTOMATICA" }
+    };
+
+    let likeThreshold = parseInt(S.get('cpuvscpu_like_n')) || 20;
+    document.getElementById('likeN').value = likeThreshold;
+
+    function getAction(key) { return mappings[key]?.action; }
+
+    const likeActInit = getAction('curtida_like');
+    if (likeActInit) document.getElementById('likeAct').value = likeActInit;
+    const memberActInit = getAction('membro');
+    if (memberActInit) document.getElementById('memberAct').value = memberActInit;
+    const shareActInit = getAction('compartilhar');
+    if (shareActInit) document.getElementById('shareAct').value = shareActInit;
+
+    renderEvents();
+
+    function saveMappings() { S.set('cpuvscpu_events', JSON.stringify(mappings)); }
+
+    function saveLike() {
+        likeThreshold = parseInt(document.getElementById('likeN').value)||20;
+        S.set('cpuvscpu_like_n', likeThreshold);
+        mappings['curtida_like'] = { action: document.getElementById('likeAct').value };
+        saveMappings(); renderEvents();
+    }
+    function saveMember() {
+        mappings['membro'] = { action: document.getElementById('memberAct').value };
+        saveMappings(); renderEvents();
+    }
+    function saveShare() {
+        mappings['compartilhar'] = { action: document.getElementById('shareAct').value };
+        saveMappings(); renderEvents();
+    }
+
+    function addEvent() {
+        const cmd    = document.getElementById('cmdInput').value.trim().toLowerCase();
+        const act    = document.getElementById('actionSel').value;
+        const repeat = Math.max(1, parseInt(document.getElementById('repeatN').value)||1);
+        if (!cmd) return;
+        mappings[cmd] = { action: act, repeat };
+        saveMappings();
+        document.getElementById('cmdInput').value = '';
+        document.getElementById('repeatN').value  = '1';
+        document.getElementById('giftSel').value  = '';
+        renderEvents();
+    }
+
+    function removeEvent(cmd) {
+        delete mappings[cmd];
+        saveMappings(); renderEvents();
+    }
+
+    function renderEvents() {
+        const entries = Object.entries(mappings);
+        const el = document.getElementById('event-list');
+        if (!entries.length) {
+            el.innerHTML = '<div style="padding:6px 8px;font-size:9.5px;color:var(--muted);">Nenhum evento.</div>';
+            return;
+        }
+        el.innerHTML = entries.map(([cmd, v]) => {
+            const label = ACTION_LABELS[v.action] || v.action;
+            const rpt   = (v.repeat||1) > 1 ? ` 🔁${v.repeat}x` : '';
+            const safeCmd = cmd.replace(/'/g, "\\'");
+            return `<div class="event-item">
+                <div class="event-label"><strong>${cmd}</strong> → ${label}${rpt}</div>
+                <div class="event-actions">
+                    <button class="btn-test" onclick="testKey('${safeCmd}')">Testar</button>
+                    <button class="btn-del"  onclick="removeEvent('${safeCmd}')">&times;</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function executeRepeated(action, user, repeat, avatar) {
+        repeat = Math.max(1, repeat||1);
+        for (let i = 0; i < repeat; i++)
+            setTimeout(() => send(resolveMsg(action, user, avatar)), i*500);
+    }
+
+    function testKey(key) {
+        const v = mappings[key]; if (!v) return;
+        const testUser = fighters.team1?.user || ('TESTE_'+key);
+        executeRepeated(v.action, testUser, v.repeat, '');
+    }
+
+    function syncGift() {
+        const val = document.getElementById('giftSel').value;
+        if (val && val !== 'CUSTOM') document.getElementById('cmdInput').value = val;
+        else if (val === 'CUSTOM')   document.getElementById('cmdInput').value = '';
+    }
+
+    // ============================================================
+    // TIKFINITY — WebSocket ws://localhost:21213/
+    // ============================================================
+    let likeCounter = 0, likeCooldown = false;
+
+    function connectTikFinity() {
+        const ws = new WebSocket('ws://localhost:21213/');
+        ws.onopen = () => { document.getElementById('dotTikf').className = 'dot on-tikf'; };
+        ws.onmessage = ev => {
+            const res = JSON.parse(ev.data);
+            const d   = res.data || res;
+            if (!d) return;
+
+            const user   = d.nickname || d.uniqueId || 'Jogador';
+            const avatar = d.profilePictureUrl || d.profilePicUrl || d.avatar || '';
+            const evType = (res.event || '').toLowerCase();
+
+            if (evType === 'gift') {
+                const giftId   = String(d.giftId || '');
+                const giftName = String(d.giftName || '').toLowerCase().trim();
+                const key = mappings[giftId] ? giftId : (mappings[giftName] ? giftName : null);
+                if (key) executeRepeated(mappings[key].action, user, mappings[key].repeat, avatar);
+                return;
+            }
+
+            let key = '', count = 1;
+            if      (evType === 'chat')    key = (d.comment||'').toLowerCase().trim();
+            else if (evType === 'command') key = (d.command||'').toLowerCase();
+            else if (evType === 'share')   key = 'compartilhar';
+            else if (evType === 'like')    { key = 'curtida_like'; count = parseInt(d.likeCount)||1; }
+            else if (evType === 'member' || evType === 'subscribe') key = 'membro';
+            else key = evType;
+
+            const v = mappings[key];
+            if (!v) return;
+
+            if (key === 'curtida_like') {
+                if (likeCooldown) return;
+                likeCounter += count;
+                if (likeCounter >= likeThreshold) {
+                    likeCooldown = true;
+                    executeRepeated(v.action, user, v.repeat, avatar);
+                    setTimeout(() => { likeCooldown = false; likeCounter = 0; }, 2000);
+                }
+            } else {
+                executeRepeated(v.action, user, v.repeat, avatar);
+            }
+        };
+        ws.onclose = () => {
+            document.getElementById('dotTikf').className = 'dot';
+            setTimeout(connectTikFinity, 5000);
+        };
+    }
+    connectTikFinity();
+    </script>
+</body>
+</html>

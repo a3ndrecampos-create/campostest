@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PUXA TRUCK — Cabo de Guerra</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Orbitron:wght@700;800;900&display=swap');
+
+:root {
+  --rosa:      #ff2e8a;
+  --rosa-dk:   #b3105f;
+  --azul:      #1e7bff;
+  --azul-dk:   #0b4ec9;
+  --gold:      #ffd23f;
+  --green:     #2bff9a;
+  --dark0:     #07060c;
+  --dark1:     #0c0a16;
+  --panel:     rgba(10,8,18,0.96);
+  --border:    rgba(255,255,255,0.08);
+  --text:      #f1edf7;
+}
+
+*,*::before,*::after { box-sizing: border-box; margin:0; padding:0; }
+
+html, body {
+  background: var(--dark0);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 4px;
+}
+
+/* ══════════════ TOP SCORE BAR ══════════════ */
+#scoreBar {
+  width: 100%;
+  max-width: 900px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  position: relative;
+  z-index: 20;
+}
+
+.teamScore {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 6px 10px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.teamScore.rosa {
+  background: linear-gradient(90deg, rgba(255,46,138,0.28), rgba(255,46,138,0.05));
+  flex-direction: row;
+}
+.teamScore.azul {
+  background: linear-gradient(270deg, rgba(30,123,255,0.28), rgba(30,123,255,0.05));
+  flex-direction: row-reverse;
+  text-align: right;
+}
+.teamScore.rosa::after, .teamScore.azul::after{
+  content:'';
+  position:absolute; inset:0;
+  pointer-events:none;
+  box-shadow: inset 0 0 18px rgba(255,255,255,0.06);
+}
+
+.scoreNum {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 900;
+  font-size: 30px;
+  min-width: 46px;
+  text-align: center;
+  line-height: 1;
+  text-shadow: 0 0 14px currentColor;
+  transition: transform 0.15s;
+}
+.teamScore.rosa .scoreNum { color: var(--rosa); }
+.teamScore.azul .scoreNum { color: var(--azul); }
+.scoreNum.bump { transform: scale(1.35); }
+
+.teamMeta { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
+.teamName {
+  font-family:'Orbitron',sans-serif;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  font-weight: 800;
+}
+.teamScore.rosa .teamName { color: #ffd5ea; }
+.teamScore.azul .teamName { color: #d4e8ff; }
+
+.giftCount {
+  font-size: 11px;
+  opacity: 0.65;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.comboTag {
+  font-family:'Orbitron',sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: var(--gold);
+  color: #2a1a00;
+  opacity: 0;
+  transform: scale(0.6);
+  white-space: nowrap;
+  box-shadow: 0 0 0 rgba(255,210,63,0);
+}
+.comboTag.show { opacity: 1; animation: comboPop 0.45s cubic-bezier(.34,1.56,.64,1); box-shadow: 0 0 14px rgba(255,210,63,0.7); }
+@keyframes comboPop {
+  0%   { transform: scale(0.3) rotate(-8deg); }
+  55%  { transform: scale(1.35) rotate(4deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+/* ── barra de força (gauge estilo mobile game) ── */
+.powerTrack {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  overflow: hidden;
+  margin-top: 2px;
+}
+.powerFill {
+  height: 100%;
+  width: 0%;
+  border-radius: 5px;
+  transition: width 0.12s ease-out;
+}
+.teamScore.rosa .powerFill { background: linear-gradient(90deg, var(--rosa-dk), var(--rosa), #ffb1d8); box-shadow: 0 0 10px var(--rosa); }
+.teamScore.azul .powerFill { background: linear-gradient(90deg, var(--azul-dk), var(--azul), #a9d3ff); box-shadow: 0 0 10px var(--azul); }
+.powerFill.hot { animation: powerHot 0.35s infinite alternate; }
+@keyframes powerHot { from { filter: brightness(1); } to { filter: brightness(1.5); } }
+.powerShine {
+  position: absolute; top:0; left:-40%;
+  width: 30%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.55), transparent);
+  animation: powerShineMove 2.2s linear infinite;
+}
+@keyframes powerShineMove { 0% { left: -40%; } 100% { left: 130%; } }
+
+#liveBadge {
+  font-family:'Orbitron',sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: #ff1744;
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 6px;
+  display:flex; align-items:center; gap:5px;
+  box-shadow: 0 0 14px rgba(255,23,68,0.6);
+  flex-shrink: 0;
+}
+#liveBadge .liveDotPulse {
+  width:6px; height:6px; border-radius:50%; background:#fff;
+  animation: livePulse 1.4s infinite;
+}
+@keyframes livePulse { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+/* ══════════════ GAME CANVAS WRAP ══════════════ */
+#gameWrap {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  aspect-ratio: 3 / 2;
+  max-height: 68vh;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#gameCanvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 12px;
+  display: block;
+}
+
+#loadingOverlay {
+  position:absolute; inset:0;
+  background: var(--dark0);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap: 14px;
+  border-radius: 12px;
+  z-index: 50;
+  transition: opacity 0.4s;
+}
+#loadingOverlay .ltitle {
+  font-family:'Orbitron',sans-serif;
+  font-size: 16px;
+  letter-spacing: 3px;
+  color: var(--gold);
+}
+#loadingBarTrack {
+  width: 220px; height: 6px; border-radius: 4px;
+  background: rgba(255,255,255,0.1);
+  overflow:hidden;
+}
+#loadingBarFill {
+  height: 100%; width:0%;
+  background: linear-gradient(90deg, var(--rosa), var(--gold), var(--azul));
+  transition: width 0.2s;
+}
+
+/* ══════════════ BOTTOM HUD: gift feed / status ══════════════ */
+#bottomHud {
+  width: 100%;
+  max-width: 900px;
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  padding: 6px 14px 10px;
+  gap: 8px;
+  position: relative;
+  z-index: 20;
+}
+
+.statusPill {
+  display:none; align-items:center; gap:6px;
+  font-size: 11px; font-weight:700; letter-spacing:0.5px;
+  color: rgba(255,255,255,0.6);
+}
+.dot { width:8px; height:8px; border-radius:50%; background:#ff2233; transition: all .4s; }
+.dot.online { background: var(--green); box-shadow:0 0 8px var(--green); animation: dotPulse 2s infinite; }
+@keyframes dotPulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+
+#configBtn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  display:none; align-items:center; justify-content:center;
+  transition: all .15s;
+}
+#configBtn:hover { background: rgba(255,255,255,0.14); transform: rotate(25deg); }
+
+/* ══════════════ CONFIG MODAL ══════════════ */
+#configModal {
+  display:none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+#configModal.open { display:flex; }
+
+.configBox {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 18px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.configBox::-webkit-scrollbar { width: 6px; }
+.configBox::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius:4px; }
+
+.configHeader {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom: 14px;
+}
+.configHeader h2 {
+  font-family:'Orbitron',sans-serif;
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: var(--gold);
+}
+.closeBtn {
+  background: rgba(255,255,255,0.08);
+  border: none; color: var(--text);
+  width: 28px; height:28px; border-radius:8px;
+  cursor:pointer; font-size: 16px;
+}
+
+.sectionLabel {
+  font-family:'Orbitron',sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.45);
+  text-transform: uppercase;
+  margin: 16px 0 8px;
+}
+
+.addRow {
+  display:flex; gap:6px; flex-wrap: wrap;
+  align-items:center;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  padding: 10px;
+  border-radius: 10px;
+}
+.addRow select, .addRow input {
+  background: #15121f;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 12px;
+  font-family: 'Rajdhani', sans-serif;
+}
+.addRow select.giftSel { flex: 1 1 170px; min-width: 130px; }
+.addRow input.cmdInput { flex: 1 1 110px; min-width: 90px; }
+.addRow select.teamSel { width: 100px; }
+.addRow input.forceInput { width: 70px; }
+.addRow select.stageSel { flex: 1 1 200px; min-width: 170px; }
+
+.teamSel option[value="rosa"] { color: var(--rosa); }
+.teamSel option[value="azul"] { color: var(--azul); }
+
+.btn {
+  font-family:'Rajdhani',sans-serif;
+  font-weight:700;
+  border:none;
+  border-radius: 7px;
+  padding: 7px 14px;
+  cursor:pointer;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  transition: transform .12s, filter .12s;
+}
+.btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-add    { background: var(--gold); color:#2a1a00; }
+.btn-test   { background: rgba(43,255,154,0.18); color: var(--green); border:1px solid rgba(43,255,154,0.4); }
+.btn-del    { background: rgba(255,46,90,0.15); color:#ff6b8a; border:1px solid rgba(255,46,90,0.35); width:26px; height:26px; padding:0; font-size:14px; }
+.btn-reset  { background: rgba(255,255,255,0.07); color: var(--text); border:1px solid var(--border); }
+.btn-full   { width:100%; justify-content:center; display:flex; padding:9px; }
+
+.mapList { display:flex; flex-direction:column; gap:6px; margin-top:10px; max-height: 220px; overflow-y:auto; }
+.mapItem {
+  display:flex; align-items:center; justify-content:space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+}
+.mapItem.team-rosa { background: rgba(255,46,138,0.08); border-color: rgba(255,46,138,0.25); }
+.mapItem.team-azul { background: rgba(30,123,255,0.08); border-color: rgba(30,123,255,0.25); }
+.mapItem b { font-weight: 800; }
+.mapItem .mapInfo { display:flex; align-items:center; gap:8px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.likeRow { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.likeRow input[type=number] { width: 64px; }
+
+.footRow { display:flex; gap:8px; margin-top: 16px; }
+.footRow .btn { flex:1; }
+
+/* ══════════════ TOASTS ══════════════ */
+#toastContainer {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  display:flex; flex-direction:column; gap:6px; z-index: 200;
+  align-items:center;
+}
+.toast {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  animation: toastIn 0.25s, toastOut 0.4s 2.6s forwards;
+}
+.toast.error { border-left-color:#ff3d5e; }
+.toast.success { border-left-color: var(--green); }
+@keyframes toastIn { from{opacity:0; transform:translateY(-10px);} to{opacity:1; transform:translateY(0);} }
+@keyframes toastOut { to { opacity:0; transform:translateY(-10px); } }
+
+@media (max-width: 480px) {
+  .scoreNum { font-size: 22px; }
+  .teamName { font-size: 10px; }
+  #liveBadge { font-size: 9px; padding:4px 7px; }
+}
+</style>
+</head>
+<body>
+
+<div id="scoreBar">
+  <div class="teamScore rosa">
+    <div class="scoreNum" id="scoreRosaEl">0</div>
+    <div class="teamMeta">
+      <div class="teamName">TEAM ROSA</div>
+      <div class="giftCount" id="giftsRosaEl">🎁 0</div>
+      <div class="powerTrack"><div class="powerFill" id="powerFillRosa"></div><div class="powerShine"></div></div>
+    </div>
+    <div class="comboTag" id="comboRosaEl">x1</div>
+  </div>
+
+  <div id="liveBadge"><span class="liveDotPulse"></span>LIVE</div>
+
+  <div class="teamScore azul">
+    <div class="scoreNum" id="scoreAzulEl">0</div>
+    <div class="teamMeta">
+      <div class="teamName">TEAM AZUL</div>
+      <div class="giftCount" id="giftsAzulEl">🎁 0</div>
+      <div class="powerTrack"><div class="powerFill" id="powerFillAzul"></div><div class="powerShine"></div></div>
+    </div>
+    <div class="comboTag" id="comboAzulEl">x1</div>
+  </div>
+</div>
+
+<div id="gameWrap">
+  <canvas id="gameCanvas" width="1200" height="800"></canvas>
+  <div id="loadingOverlay">
+    <div class="ltitle">CARREGANDO ARENA...</div>
+    <div id="loadingBarTrack"><div id="loadingBarFill"></div></div>
+  </div>
+</div>
+
+<div id="bottomHud">
+  <div class="statusPill"><span class="dot" id="connDot"></span><span id="statusText">OFFLINE</span></div>
+  <button id="configBtn" title="Configurações">⚙️</button>
+</div>
+
+<!-- ═══════════ CONFIG MODAL ═══════════ -->
+<div id="configModal">
+  <div class="configBox">
+    <div class="configHeader">
+      <h2>⚙️ CONFIGURAÇÕES — PUXA TRUCK</h2>
+      <button class="closeBtn" id="closeConfigBtn">✕</button>
+    </div>
+
+    <div class="sectionLabel">Adicionar presente / comando</div>
+    <div class="addRow">
+      <select class="giftSel" id="giftSelector" onchange="syncGiftInput()"></select>
+      <input class="cmdInput" id="cmdInput" type="text" placeholder="ou digite comando de chat">
+      <select class="teamSel" id="teamSelect">
+        <option value="rosa">🌸 Rosa</option>
+        <option value="azul">🔵 Azul</option>
+      </select>
+      <select class="stageSel" id="stageSelect"></select>
+      <button class="btn btn-add" onclick="addEvent()">+ Adicionar</button>
+    </div>
+
+    <div class="sectionLabel">Mapeamentos ativos</div>
+    <div class="mapList" id="eventList"></div>
+
+    <div class="sectionLabel">Curtidas (likes)</div>
+    <div class="addRow likeRow">
+      <span style="font-size:12px;">A cada</span>
+      <input type="number" id="likeThresholdInput" value="10" min="1">
+      <span style="font-size:12px;">likes →</span>
+      <select class="teamSel" id="likeTeamSelect">
+        <option value="rosa">🌸 Rosa</option>
+        <option value="azul">🔵 Azul</option>
+      </select>
+      <select class="stageSel" id="likeStageSelect"></select>
+      <button class="btn btn-add" onclick="saveLikeConfig()">Salvar</button>
+    </div>
+
+    <div class="footRow">
+      <button class="btn btn-reset" onclick="resetMappings()">🔄 Resetar Mapeamentos</button>
+      <button class="btn btn-reset" onclick="resetScore()">🏳️ Resetar Placar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   PUXA TRUCK — Cabo de Guerra Reverso
+   Times de monster truck conectados por corrente. Cada lado
+   recebe "força de puxada" via presentes/likes/chat do Tikfinity.
+   Quem puxar o adversário até a própria zona, marca ponto.
+══════════════════════════════════════════════════════════ */
+
+/* ───────── CATÁLOGO DE PRESENTES (Tikfinity / TikTok) ───────── */
+const GIFT_CATALOG = [{"id":"14295","name":"Dates"},{"id":"6926","name":"Basketball"},{"id":"13298","name":"Wink Charm"},{"id":"13651","name":"Go Popular"},{"id":"13282","name":"Slay"},{"id":"12355","name":"Club Cheers"},{"id":"9097","name":"Birthday Cake"},{"id":"9087","name":"Flame Heart"},{"id":"7934","name":"Heart Me"},{"id":"6652","name":"Lightning Bolt"},{"id":"6784","name":"Cake Slice"},{"id":"7002","name":"Garden Gnome"},{"id":"6890","name":"Love You"},{"id":"5333","name":"Coffee"},{"id":"6247","name":"Heart"},{"id":"6246","name":"Thumbs Up"},{"id":"6169","name":"Tennis"},{"id":"6064","name":"GG"},{"id":"6042","name":"Mini Speaker"},{"id":"5827","name":"Ice Cream Cone"},{"id":"5655","name":"Rose"},{"id":"5269","name":"TikTok"},{"id":"9139","name":"Team Bracelet"},{"id":"7136","name":"Golden Player"},{"id":"10179","name":"Lily of the Valley"},{"id":"5719","name":"Fire"},{"id":"5650","name":"Mic"},{"id":"5487","name":"Finger Heart"},{"id":"37","name":"Panda"},{"id":"6519","name":"Guacamole"},{"id":"9622","name":"Applause"},{"id":"8243","name":"Cheer You Up"},{"id":"6113","name":"Taco"},{"id":"6059","name":"Hand Wave"},{"id":"13300","name":"Heart Gaze"},{"id":"5853","name":"Gold Boxing Gloves"},{"id":"9947","name":"Friendship Necklace"},{"id":"8913","name":"Rosa"},{"id":"7341","name":"Panther"},{"id":"6560","name":"Tiny Diny"},{"id":"6249","name":"Rugby Ball"},{"id":"6052","name":"Gamepad"},{"id":"5657","name":"Lollipop"},{"id":"8552","name":"Baby Fox"},{"id":"5740","name":"Headphones"},{"id":"5919","name":"Love You"},{"id":"5780","name":"Bouquet Flower"},{"id":"5879","name":"Doughnut"},{"id":"8259","name":"Sign Language Love"},{"id":"10300","name":"Butterfly"},{"id":"8434","name":"Ruby Red"},{"id":"6968","name":"Hand Heart"},{"id":"6960","name":"Game Controller"},{"id":"5585","name":"Confetti"},{"id":"5660","name":"Hand Hearts"},{"id":"5729","name":"Butterfly"},{"id":"5915","name":"Music Note"},{"id":"13981","name":"Love Charger"},{"id":"11177","name":"Coffee Magic"},{"id":"7927","name":"Puppy Love"},{"id":"7839","name":"Shiba Inu"},{"id":"7549","name":"Gamer Cat"},{"id":"6713","name":"Cheer For You"},{"id":"6436","name":"Love Focus"},{"id":"5937","name":"Hanging Lights"},{"id":"5586","name":"Hearts"},{"id":"5509","name":"Sunglasses"},{"id":"5599","name":"Gold Necklace"},{"id":"7883","name":"Guitar"},{"id":"6559","name":"Breakthrough Star"},{"id":"6432","name":"Star"},{"id":"6097","name":"Little Crown"},{"id":"6104","name":"Cap"},{"id":"5659","name":"Paper Crane"},{"id":"7264","name":"Mishka Bear"},{"id":"5566","name":"Mishka Bear"},{"id":"14000","name":"Bowknot"},{"id":"5328","name":"Sem descricao"},{"id":"14294","name":"Sparklers"},{"id":"10573","name":"Massage for You"},{"id":"10560","name":"Stinging Bee"},{"id":"8600","name":"Sending Positivity"},{"id":"8066","name":"Goggles"},{"id":"7166","name":"Roman Empire"},{"id":"11808","name":"Rock Star"},{"id":"11183","name":"Play for You"},{"id":"10574","name":"Dancing Flower"},{"id":"8873","name":"TikTok Crown"},{"id":"8260","name":"Elephant Trunk"},{"id":"8111","name":"Superpower"},{"id":"7222","name":"Full Moon"},{"id":"6868","name":"Hedgehog"},{"id":"6532","name":"Dancing Cactus"},{"id":"6265","name":"Duck"},{"id":"6267","name":"Corgi"},{"id":"6007","name":"Boxing Gloves"},{"id":"5882","name":"Rock n Roll"},{"id":"5661","name":"Air Dancer"},{"id":"14110","name":"You Are Loved"},{"id":"12210","name":"Rosie the Rose Bean"},{"id":"10395","name":"Gaming Headset"},{"id":"8107","name":"Flower Flight"},{"id":"8914","name":"Forever Rosa"},{"id":"5662","name":"Necklace"},{"id":"8750","name":"Gold Microphone"},{"id":"8244","name":"Hands Up"},{"id":"6415","name":"Music"},{"id":"10669","name":"Future City"},{"id":"8604","name":"Starfish Bay"},{"id":"5627","name":"Romantic Carriage"},{"id":"9095","name":"Birthday Party"},{"id":"8247","name":"Happy Party"},{"id":"6089","name":"Sports Car"},{"id":"11599","name":"Dubai"},{"id":"8420","name":"Star Throne"},{"id":"8104","name":"Monster Truck"},{"id":"6103","name":"Yacht"},{"id":"5803","name":"Beach House"},{"id":"13307","name":"Luxury Yacht"},{"id":"8417","name":"Octopus"},{"id":"6203","name":"Sunset Speedway"},{"id":"6149","name":"Interstellar"},{"id":"7627","name":"Falcon"},{"id":"8599","name":"Convertible Car"},{"id":"8419","name":"Red Lightning"},{"id":"6892","name":"Race Car"},{"id":"6520","name":"Camping Night"},{"id":"14310","name":"Tidecaller Trident"},{"id":"13790","name":"Invincible Hammer"},{"id":"8737","name":"Speedster"},{"id":"8912","name":"Rosa Nebula"},{"id":"8435","name":"Pyramids"},{"id":"8387","name":"Peacock"},{"id":"7978","name":"Leopard"},{"id":"7598","name":"Pirates Ship"},{"id":"7911","name":"Mammoth"},{"id":"5954","name":"Planet"},{"id":"9466","name":"Amusement Park"},{"id":"7125","name":"Premium Shuttle"},{"id":"6833","name":"Castle Fantasy"},{"id":"5930","name":"Rocket"},{"id":"13791","name":"Chasing Glory"},{"id":"7987","name":"Griffin"},{"id":"7319","name":"Phoenix"},{"id":"7610","name":"Dragon Flame"},{"id":"6369","name":"Lion"},{"id":"8814","name":"Superhero Fight"},{"id":"8602","name":"Gorilla"},{"id":"8391","name":"Sam the Whale"},{"id":"7312","name":"TikTok Universe+"},{"id":"6039","name":"TikTok Universe"},{"id":"8651","name":"Thunder Falcon"},{"id":"9092","name":"Fire Phoenix"},{"id":"14312","name":"Lord Marcellus"},{"id":"9427","name":"Pegasus"},{"id":"9101","name":"TikTok Universe"}];
+
+/* ───────── ESTÁGIOS DE MOTOR (força) ───────── */
+const MOTOR_STAGES = [
+  { stage: 1, label: '⚙️ Estágio 1 — Marcha Lenta', force: 5 },
+  { stage: 2, label: '⚙️⚙️ Estágio 2 — Acelerando', force: 10 },
+  { stage: 3, label: '⚙️⚙️⚙️ Estágio 3 — Forte', force: 18 },
+  { stage: 4, label: '🔥 Estágio 4 — Turbo', force: 28 },
+  { stage: 5, label: '🔥🔥 Estágio 5 — Nitro', force: 40 },
+];
+function forceForStage(stage) {
+  const s = MOTOR_STAGES.find(s => s.stage === Number(stage));
+  return s ? s.force : MOTOR_STAGES[0].force;
+}
+function populateStageSelectors() {
+  const opts = MOTOR_STAGES.map(s => `<option value="${s.stage}">${s.label} (força ${s.force})</option>`).join('');
+  const a = document.getElementById('stageSelect');
+  const b = document.getElementById('likeStageSelect');
+  if (a) a.innerHTML = opts;
+  if (b) b.innerHTML = opts;
+}
+
+/* ───────── ASSETS ───────── */
+const ASSET_LIST = {
+  arena:    'assets/arena.jpg',
+  corrente: 'assets/corrente.png',
+  ele4: 'assets/ele4.png', // sprite única do truck azul
+  ela1: 'assets/ela1.png', // sprite única do truck rosa
+};
+
+const IMAGES = {};
+let assetsLoaded = 0;
+const assetKeys = Object.keys(ASSET_LIST);
+
+function loadAssets(onDone) {
+  assetKeys.forEach(key => {
+    const img = new Image();
+    img.onload = img.onerror = () => {
+      assetsLoaded++;
+      const pct = Math.round((assetsLoaded / assetKeys.length) * 100);
+      const fill = document.getElementById('loadingBarFill');
+      if (fill) fill.style.width = pct + '%';
+      if (assetsLoaded >= assetKeys.length) onDone();
+    };
+    img.src = ASSET_LIST[key];
+    IMAGES[key] = img;
+  });
+}
+
+/* Uma única sprite por time (sem variação por estado). */
+const SPRITE_MAP = {
+  // flip=true faz o truck olhar para a ESQUERDA (rumo à própria zona/casa).
+  // Assim a TRASEIRA de cada truck fica voltada pro centro, onde a corrente prende.
+  rosa: { img: 'ela1', flip: true  },
+  azul: { img: 'ele4', flip: false },
+};
+
+const GRID_COLS = 6, GRID_ROWS = 6, TOTAL_FRAMES = GRID_COLS * GRID_ROWS;
+
+/* Desenha um frame de uma sprite sheet 6x6 no canvas, com flip horizontal opcional */
+function drawSpriteFrame(ctx, img, frameIndex, dx, dy, dw, dh, flip) {
+  if (!img || !img.complete || !img.naturalWidth) return;
+  const fIdx = Math.max(0, Math.min(TOTAL_FRAMES - 1, Math.floor(frameIndex)));
+  const col = fIdx % GRID_COLS, row = Math.floor(fIdx / GRID_COLS);
+  const fw = img.naturalWidth / GRID_COLS, fh = img.naturalHeight / GRID_ROWS;
+  const sx = col * fw, sy = row * fh;
+  ctx.save();
+  if (flip) {
+    ctx.translate(dx + dw, dy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, sx, sy, fw, fh, 0, 0, dw, dh);
+  } else {
+    ctx.drawImage(img, sx, sy, fw, fh, dx, dy, dw, dh);
+  }
+  ctx.restore();
+}
+
+/* ───────── ESTADO DO JOGO ───────── */
+const CANVAS_W = 1200, CANVAS_H = 800;
+const CAP_LIMIT   = 100;   // limite da corda (-100 a +100)
+const PULL_RATE    = 0.012; // sensibilidade do puxão por unidade de força
+const FORCE_DECAY  = 0.986; // decaimento da força por frame (~60fps)
+const HOME_CX       = 600;  // centro de repouso do cabo de guerra
+const TRUCK_SEP_HALF = 195; // metade da distância fixa entre os dois trucks (corrente rígida)
+const SLIDE_AMPL    = 380;  // quanto o sistema desliza até a captura
+const FINISH_ROSA_X = HOME_CX - SLIDE_AMPL + TRUCK_SEP_HALF; // bandeira no território rosa
+const FINISH_AZUL_X = HOME_CX + SLIDE_AMPL - TRUCK_SEP_HALF; // bandeira no território azul
+const ZONE_W = 70; // largura visual do brilho de tensão nas bandeiras nas bordas
+const TRUCK_W = 300, TRUCK_H = 222; // tamanho de desenho do truck no canvas
+const TRUCK_DY = 40; // deslocamento vertical do topo do sprite em relação ao "pé" do truck
+
+const game = {
+  forceRosa: 0,
+  forceAzul: 0,
+  ropePos: 0,         // -100 (azul capturado) .. +100 (rosa capturado)
+  scoreRosa: parseInt(localStorage.getItem('tug_score_rosa')) || 0,
+  scoreAzul: parseInt(localStorage.getItem('tug_score_azul')) || 0,
+  giftsRosa: parseInt(localStorage.getItem('tug_gifts_rosa')) || 0,
+  giftsAzul: parseInt(localStorage.getItem('tug_gifts_azul')) || 0,
+  captureLock: false,
+  shakeTime: 0,
+  shakeMag: 0,
+  flashTime: 0,
+  flashMax: 1,
+  flashColor: '#ffffff',
+  zoomPunch: 0,
+  bigTexts: [],
+  particles: [],
+  floaters: [],
+  comboRosa: { count: 0, lastTime: 0 },
+  comboAzul: { count: 0, lastTime: 0 },
+};
+
+const FORCE_BAR_MAX = 45; // força visual "cheia" na barra de gauge da HUD
+
+const truckAnim = {
+  rosa: { frame: 0, speed: 8, oneShot: false, oneShotDone: null, punch: 0 },
+  azul: { frame: 0, speed: 8, oneShot: false, oneShotDone: null, punch: 0 },
+};
+
+function saveScores() {
+  localStorage.setItem('tug_score_rosa', game.scoreRosa);
+  localStorage.setItem('tug_score_azul', game.scoreAzul);
+  localStorage.setItem('tug_gifts_rosa', game.giftsRosa);
+  localStorage.setItem('tug_gifts_azul', game.giftsAzul);
+}
+
+function resetScore() {
+  if (!confirm('Resetar o placar da live?')) return;
+  game.scoreRosa = 0; game.scoreAzul = 0;
+  game.giftsRosa = 0; game.giftsAzul = 0;
+  saveScores();
+  updateScoreUI(true);
+  showToast('Placar resetado!', 'success');
+}
+
+/* ───────── FORÇA / GIFTS ───────── */
+function addForce(team, amount, opts) {
+  opts = opts || {};
+  if (game.captureLock) return; // ignora durante animação de captura
+  amount = Math.max(0, Number(amount) || 0);
+  if (amount <= 0) return;
+
+  if (team === 'rosa') game.forceRosa += amount;
+  else game.forceAzul += amount;
+
+  game[team === 'rosa' ? 'giftsRosa' : 'giftsAzul']++;
+  saveScores();
+  updateScoreUI(false);
+
+  // combo: presentes do mesmo time em sequência rápida (<3.5s)
+  const combo = team === 'rosa' ? game.comboRosa : game.comboAzul;
+  const now = performance.now();
+  if (now - combo.lastTime < 3500) combo.count++;
+  else combo.count = 1;
+  combo.lastTime = now;
+  showCombo(team, combo.count);
+
+  // partícula de força na posição do truck
+  const pos = getTruckPositions();
+  const tx = team === 'rosa' ? pos.rosaX : pos.azulX;
+  spawnFloater(tx, pos.y - 60, '+' + amount, team === 'rosa' ? '#ff2e8a' : '#1e7bff');
+  spawnPullBurst(tx, pos.y, team);
+
+  // "punch" de squash/stretch no truck — juice estilo jogo mobile
+  truckAnim[team].punch = Math.min(1, truckAnim[team].punch + 0.55);
+}
+
+function showCombo(team, count) {
+  const el = document.getElementById(team === 'rosa' ? 'comboRosaEl' : 'comboAzulEl');
+  if (!el) return;
+  if (count >= 2) {
+    el.textContent = 'x' + count;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+}
+
+/* ───────── POSIÇÕES ─────────
+   Corrente rígida: a distância entre os dois trucks é sempre a mesma.
+   Os dois se deslocam JUNTOS na direção de quem está vencendo — o
+   vencedor avança rumo à própria bandeira e arrasta o adversário atrás
+   dele, exatamente como um cabo de guerra de verdade. Assim os dois
+   sempre se movem, e nunca um cruza a posição do outro. */
+function getTruckPositions() {
+  const cx = HOME_CX - (game.ropePos / CAP_LIMIT) * SLIDE_AMPL;
+  return {
+    rosaX: cx - TRUCK_SEP_HALF,
+    azulX: cx + TRUCK_SEP_HALF,
+    y: CANVAS_H * 0.62,
+  };
+}
+
+/* ───────── ATUALIZAÇÃO PRINCIPAL ───────── */
+function updateGame(dt) {
+  // decaimento da força (sustentar o puxão exige presentes contínuos)
+  game.forceRosa *= Math.pow(FORCE_DECAY, dt);
+  game.forceAzul *= Math.pow(FORCE_DECAY, dt);
+  if (game.forceRosa < 0.01) game.forceRosa = 0;
+  if (game.forceAzul < 0.01) game.forceAzul = 0;
+
+  if (!game.captureLock) {
+    const net = game.forceRosa - game.forceAzul; // >0 rosa puxando azul pra esquerda
+    game.ropePos += net * PULL_RATE * dt;
+    game.ropePos = Math.max(-CAP_LIMIT, Math.min(CAP_LIMIT, game.ropePos));
+
+    updateTruckState('rosa');
+    updateTruckState('azul');
+
+    if (game.ropePos >= CAP_LIMIT) triggerCapture('rosa');     // rosa puxou azul até o fim -> rosa marca
+    else if (game.ropePos <= -CAP_LIMIT) triggerCapture('azul'); // azul puxou rosa até o fim -> azul marca
+  }
+
+  tickTruckAnim('rosa', dt);
+  tickTruckAnim('azul', dt);
+  maybeSpawnEngineDust('rosa', dt);
+  maybeSpawnEngineDust('azul', dt);
+  updateParticles(dt);
+  updateFloaters(dt);
+  updateBigTexts(dt);
+  if (game.shakeTime > 0) game.shakeTime -= dt;
+  if (game.flashTime > 0) game.flashTime -= dt;
+  if (game.zoomPunch > 0) game.zoomPunch = Math.max(0, game.zoomPunch - 0.06 * dt);
+  updatePowerBars();
+}
+
+/* ───────── BARRAS DE FORÇA (GAUGE) ───────── */
+function updatePowerBars() {
+  const fr = document.getElementById('powerFillRosa');
+  const fa = document.getElementById('powerFillAzul');
+  if (fr) {
+    const pr = Math.max(0, Math.min(1, game.forceRosa / FORCE_BAR_MAX));
+    fr.style.width = (pr * 100) + '%';
+    fr.classList.toggle('hot', pr > 0.75);
+  }
+  if (fa) {
+    const pa = Math.max(0, Math.min(1, game.forceAzul / FORCE_BAR_MAX));
+    fa.style.width = (pa * 100) + '%';
+    fa.classList.toggle('hot', pa > 0.75);
+  }
+}
+
+/* Poeira de motor que aumenta conforme a velocidade/força do puxão */
+function maybeSpawnEngineDust(team, dt) {
+  const anim = truckAnim[team];
+  if (anim.oneShot) return;
+  const chance = Math.min(0.9, anim.speed / 28) * dt * 0.4;
+  if (Math.random() < chance) {
+    const pos = getTruckPositions();
+    const x = (team === 'rosa' ? pos.rosaX : pos.azulX) + (Math.random() - 0.5) * 60;
+    game.particles.push({
+      x, y: pos.y + 6,
+      vx: (Math.random() - 0.5) * 0.6,
+      vy: -0.3 - Math.random() * 0.5,
+      life: 26 + Math.random() * 16,
+      maxLife: 42,
+      size: 5 + Math.random() * 7,
+      color: 'rgba(255,255,255,0.3)',
+      type: 'spark',
+    });
+  }
+}
+
+function updateTruckState(team) {
+  const anim = truckAnim[team];
+  if (anim.oneShot) return; // não interrompe animação de quebra
+  const mine   = team === 'rosa' ? game.forceRosa : game.forceAzul;
+  const theirs = team === 'rosa' ? game.forceAzul : game.forceRosa;
+  const diff = mine - theirs;
+  let state = 'idle';
+  if (diff > 4) state = 'forte';
+  else if (diff < -4) state = 'perdendo';
+
+  // velocidade da animação aumenta conforme está puxando forte, e ainda mais
+  // conforme o perigo de captura aumenta (mesma sprite, só mais rápida)
+  const danger = team === 'rosa' ? Math.max(0, -game.ropePos) / CAP_LIMIT : Math.max(0, game.ropePos) / CAP_LIMIT;
+  anim.speed = state === 'perdendo' ? 8 + danger * 16 : (state === 'forte' ? 14 : 6);
+}
+
+/* Percorre todos os frames da sprite sheet normalmente (animação completa). */
+function tickTruckAnim(team, dt) {
+  const anim = truckAnim[team];
+  anim.frame += (anim.speed * dt) / 60 * (60/16.6); // normalizado ~frames/seg
+  anim.punch = Math.max(0, anim.punch - 0.09 * dt); // decaimento do "punch" (squash/stretch)
+  if (anim.oneShot) {
+    if (anim.frame >= TOTAL_FRAMES - 1) {
+      anim.frame = TOTAL_FRAMES - 1;
+      if (anim.oneShotDone) { const cb = anim.oneShotDone; anim.oneShotDone = null; cb(); }
+    }
+  } else {
+    if (anim.frame >= TOTAL_FRAMES) anim.frame = anim.frame % TOTAL_FRAMES;
+  }
+}
+
+/* ───────── CAPTURA / PONTO ───────── */
+function triggerCapture(winner) {
+  if (game.captureLock) return;
+  game.captureLock = true;
+  const loser = winner === 'rosa' ? 'azul' : 'rosa';
+
+  const anim = truckAnim[loser];
+  anim.frame = 0;
+  anim.speed = 16;
+  anim.oneShot = true;
+  anim.oneShotDone = () => {
+    if (winner === 'rosa') game.scoreRosa++; else game.scoreAzul++;
+    saveScores();
+    updateScoreUI(true);
+    setTimeout(() => {
+      game.ropePos = 0;
+      game.forceRosa = 0; game.forceAzul = 0;
+      truckAnim.rosa.frame = 0; truckAnim.rosa.oneShot = false;
+      truckAnim.azul.frame = 0; truckAnim.azul.oneShot = false;
+      game.captureLock = false;
+    }, 650);
+  };
+
+  const pos = getTruckPositions();
+  const lx = loser === 'rosa' ? pos.rosaX : pos.azulX;
+  spawnExplosion(lx, pos.y);
+  triggerShake(22, 0.55);
+  triggerFlash(winner === 'rosa' ? '#ff2e8a' : '#1e7bff', 0.5);
+  game.zoomPunch = 1;
+  spawnConfetti(CANVAS_W / 2, CANVAS_H * 0.3);
+  spawnBigText(winner === 'rosa' ? 'TEAM ROSA MARCOU!' : 'TEAM AZUL MARCOU!', winner === 'rosa' ? '#ff2e8a' : '#1e7bff');
+}
+
+function triggerShake(mag, time) { game.shakeMag = mag; game.shakeTime = time; }
+function triggerFlash(color, time) { game.flashColor = color; game.flashMax = time; game.flashTime = time; }
+
+/* ───────── PARTÍCULAS ───────── */
+function spawnPullBurst(x, y, team) {
+  const color = team === 'rosa' ? '#ff2e8a' : '#1e7bff';
+  for (let i = 0; i < 14; i++) {
+    game.particles.push({
+      x, y: y - 30 + Math.random() * 20,
+      vx: (Math.random() - 0.5) * 4,
+      vy: -1.2 - Math.random() * 2.5,
+      life: 30 + Math.random() * 15,
+      maxLife: 45,
+      size: 3 + Math.random() * 4,
+      color,
+      glow: color,
+      type: 'spark',
+    });
+  }
+}
+
+function spawnExplosion(x, y) {
+  for (let i = 0; i < 46; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 2.5 + Math.random() * 7.5;
+    game.particles.push({
+      x, y,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd - 2,
+      life: 35 + Math.random() * 25,
+      maxLife: 60,
+      size: 4 + Math.random() * 8,
+      color: ['#ffd23f', '#ff6b1a', '#ff2e2e', '#fff', '#888'][Math.floor(Math.random() * 5)],
+      glow: '#ffd23f',
+      type: 'debris',
+      grav: 0.18,
+    });
+  }
+  // ondas de choque
+  for (let i = 0; i < 2; i++) {
+    game.particles.push({
+      x, y, vx: 0, vy: 0,
+      life: 22 - i * 4, maxLife: 22 - i * 4,
+      size: 10, maxSize: 130 + i * 40,
+      color: '#ffd23f', type: 'ring',
+    });
+  }
+}
+
+function spawnConfetti(cx, cy) {
+  const colors = ['#ff2e8a', '#1e7bff', '#ffd23f', '#2bff9a', '#fff'];
+  for (let i = 0; i < 60; i++) {
+    game.particles.push({
+      x: cx + (Math.random() - 0.5) * 260,
+      y: cy - 60 - Math.random() * 80,
+      vx: (Math.random() - 0.5) * 2.4,
+      vy: 1.5 + Math.random() * 2.5,
+      life: 90 + Math.random() * 40,
+      maxLife: 130,
+      size: 5 + Math.random() * 5,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      type: 'confetti',
+      rot: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.3,
+      grav: 0.05,
+    });
+  }
+}
+
+function updateParticles(dt) {
+  game.particles = game.particles.filter(p => p.life > 0);
+  game.particles.forEach(p => {
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.grav) p.vy += p.grav * dt;
+    if (p.rotSpeed) p.rot += p.rotSpeed * dt;
+    p.life -= dt;
+  });
+}
+
+function drawParticles(ctx) {
+  game.particles.forEach(p => {
+    const a = Math.max(0, p.life / p.maxLife);
+    ctx.save();
+    ctx.globalAlpha = a;
+
+    if (p.type === 'ring') {
+      const t = 1 - p.life / p.maxLife;
+      const r = 10 + t * p.maxSize;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 5 * a;
+      ctx.shadowColor = p.color; ctx.shadowBlur = 18;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+    } else if (p.type === 'confetti') {
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66);
+    } else {
+      if (p.glow) { ctx.shadowColor = p.glow; ctx.shadowBlur = 12; }
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+}
+
+/* ───────── TEXTOS FLUTUANTES (+N) ───────── */
+function spawnFloater(x, y, text, color) {
+  game.floaters.push({ x, y, text, color, life: 55, maxLife: 55, vy: -1.1 });
+}
+function updateFloaters(dt) {
+  game.floaters = game.floaters.filter(f => f.life > 0);
+  game.floaters.forEach(f => { f.y += f.vy * dt; f.life -= dt; });
+}
+function drawFloaters(ctx) {
+  game.floaters.forEach(f => {
+    const t = 1 - f.life / f.maxLife;
+    const a = Math.max(0, f.life / f.maxLife);
+    const pop = t < 0.15 ? t / 0.15 : 1;
+    const scale = 0.4 + Math.min(1.25, pop * 1.25) - (pop >= 1 ? Math.min(0.25, (t - 0.15) * 0.4) : 0);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(f.x, f.y);
+    ctx.scale(scale, scale);
+    ctx.font = 'bold 26px Orbitron, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = f.color; ctx.shadowBlur = 14;
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.lineWidth = 4;
+    ctx.strokeText(f.text, 0, 0);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, 0, 0);
+    ctx.restore();
+  });
+}
+
+/* ───────── TEXTO GRANDE DE PONTO ───────── */
+function spawnBigText(text, color) {
+  game.bigTexts.push({ text, color, life: 90, maxLife: 90 });
+}
+function updateBigTexts(dt) {
+  game.bigTexts = game.bigTexts.filter(b => b.life > 0);
+  game.bigTexts.forEach(b => b.life -= dt);
+}
+function drawBigTexts(ctx) {
+  game.bigTexts.forEach(b => {
+    const t = 1 - b.life / b.maxLife;
+    const pop = t < 0.18 ? t / 0.18 : 1;
+    const fade = t > 0.7 ? 1 - (t - 0.7) / 0.3 : 1;
+    const scale = 0.6 + pop * 0.5 - (t > 0.85 ? (t - 0.85) * 1.5 : 0);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, fade);
+    ctx.translate(CANVAS_W / 2, CANVAS_H * 0.32);
+    ctx.scale(scale, scale);
+    ctx.font = '900 54px Orbitron, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = b.color; ctx.shadowBlur = 30;
+    ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.strokeText(b.text, 0, 0);
+    ctx.fillStyle = b.color;
+    ctx.fillText(b.text, 0, 0);
+    ctx.restore();
+  });
+}
+
+/* ───────── DESENHO DA CENA ───────── */
+function drawScene(ctx) {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // shake
+  let ox = 0, oy = 0;
+  if (game.shakeTime > 0) {
+    const f = game.shakeTime;
+    ox = (Math.random() - 0.5) * game.shakeMag * Math.min(1, f);
+    oy = (Math.random() - 0.5) * game.shakeMag * Math.min(1, f) * 0.6;
+  }
+  ctx.save();
+
+  // zoom punch — pequeno "soco" de zoom no impacto da pontuação
+  const zoomScale = 1 + game.zoomPunch * 0.05;
+  ctx.translate(CANVAS_W / 2, CANVAS_H / 2);
+  ctx.scale(zoomScale, zoomScale);
+  ctx.translate(-CANVAS_W / 2 + ox, -CANVAS_H / 2 + oy);
+
+  // arena bg
+  if (IMAGES.arena && IMAGES.arena.complete) {
+    ctx.drawImage(IMAGES.arena, 0, 0, CANVAS_W, CANVAS_H);
+  } else {
+    ctx.fillStyle = '#1a1410'; ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  }
+
+  // tensão: zonas de captura brilham mais conforme o perigo aumenta
+  const dangerRosa = Math.max(0, -game.ropePos) / CAP_LIMIT; // truck rosa em risco
+  const dangerAzul = Math.max(0, game.ropePos) / CAP_LIMIT;  // truck azul em risco
+
+  const pos = getTruckPositions();
+
+  // marcas de chegada (bandeiras) — ponto fixo onde a captura acontece
+  drawFinishFlag(ctx, FINISH_ROSA_X, pos.y, '#ff2e8a');
+  drawFinishFlag(ctx, FINISH_AZUL_X, pos.y, '#1e7bff');
+
+  // brilho de tensão nas marcas conforme o perigo aumenta
+  drawCaptureZone(ctx, FINISH_ROSA_X, pos.y, '#ff2e8a', dangerAzul);
+  drawCaptureZone(ctx, FINISH_AZUL_X, pos.y, '#1e7bff', dangerRosa);
+
+  // corrente — sempre da posição mais à esquerda para a mais à direita,
+  // mesmo se o truck arrastado passar da posição do vencedor
+  const chainX1 = Math.min(pos.rosaX, pos.azulX) + 130;
+  const chainX2 = Math.max(Math.max(pos.rosaX, pos.azulX) - 130, chainX1 + 6);
+  const chainY = pos.y - TRUCK_H / 2 + TRUCK_DY; // meia altura do truck
+  drawChain(ctx, chainX1, chainY, chainX2, chainY);
+
+  // trucks — o que estiver mais à frente (maior x) desenha por último (por cima)
+  if (pos.rosaX <= pos.azulX) {
+    drawTruck(ctx, 'rosa', pos.rosaX, pos.y);
+    drawTruck(ctx, 'azul', pos.azulX, pos.y);
+  } else {
+    drawTruck(ctx, 'azul', pos.azulX, pos.y);
+    drawTruck(ctx, 'rosa', pos.rosaX, pos.y);
+  }
+
+  drawParticles(ctx);
+  drawFloaters(ctx);
+  drawBigTexts(ctx);
+
+  ctx.restore();
+
+  // flash de tela — pulso de cor no momento da pontuação
+  if (game.flashTime > 0) {
+    const a = Math.max(0, game.flashTime / game.flashMax) * 0.55;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = game.flashColor;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.restore();
+  }
+}
+
+function drawCaptureZone(ctx, x, y, color, intensity) {
+  ctx.save();
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
+  ctx.globalAlpha = 0.25 + intensity * 0.55 * (0.7 + 0.3 * pulse);
+  const grd = ctx.createRadialGradient(x, y, 4, x, y, 90);
+  grd.addColorStop(0, color);
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.ellipse(x, y, 90, 130, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+/* Bandeira quadriculada marcando o ponto de chegada de cada time */
+function drawFinishFlag(ctx, x, y, color) {
+  ctx.save();
+  const poleTop = y - 300, poleBottom = y + 20;
+
+  // linha pontilhada no chão marcando a linha de chegada
+  ctx.setLineDash([10, 10]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(x, y + 18); ctx.lineTo(x, y + 46); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // sombra da base
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(x, y + 20, 22, 8, 0, 0, Math.PI * 2); ctx.fill();
+
+  // mastro
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(x, poleBottom); ctx.lineTo(x, poleTop); ctx.stroke();
+
+  // bandeira triangular quadriculada
+  const flagW = 72, flagH = 46;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, poleTop);
+  ctx.lineTo(x + flagW, poleTop + flagH * 0.35);
+  ctx.lineTo(x, poleTop + flagH);
+  ctx.closePath();
+  ctx.clip();
+  const rows = 4, cols = 6;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      ctx.fillStyle = (r + c) % 2 === 0 ? color : '#0b0b0f';
+      ctx.fillRect(x + c * (flagW / cols), poleTop + r * (flagH / rows), flagW / cols + 1, flagH / rows + 1);
+    }
+  }
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, poleTop); ctx.lineTo(x + flagW, poleTop + flagH * 0.35); ctx.lineTo(x, poleTop + flagH);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawChain(ctx, x1, y1, x2, y2) {
+  const img = IMAGES.corrente;
+  if (!img || !img.complete || !img.naturalWidth) return;
+  // recorta a faixa central da corrente (sem as pontas de gancho do parachoque)
+  const sx = img.naturalWidth * 0.085, sw = img.naturalWidth * 0.83;
+  const sy = img.naturalHeight * 0.30, sh = img.naturalHeight * 0.20;
+  const w = x2 - x1;
+  const sagAmount = Math.min(40, Math.abs(w) * 0.05);
+  const midY = (y1 + y2) / 2 + sagAmount;
+  ctx.save();
+  // desenha em 2 metades levemente anguladas para simular o sag, sem distorcer demais
+  ctx.drawImage(img, sx, sy, sw / 2, sh, x1, y1 - 16, w / 2, 34 + sagAmount * 0.4);
+  ctx.drawImage(img, sx + sw / 2, sy, sw / 2, sh, x1 + w / 2, midY - 18, w / 2, 34 + sagAmount * 0.4);
+  ctx.restore();
+}
+
+function drawTruck(ctx, team, x, y) {
+  const map = SPRITE_MAP[team];
+  const anim = truckAnim[team];
+  const img = IMAGES[map.img];
+
+  // squash/stretch "punch" — dá aquele bounce de impacto ao receber força
+  const p = anim.punch;
+  const sx = 1 + p * 0.14;
+  const sy = 1 - p * 0.12;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sx, sy);
+  drawSpriteFrame(ctx, img, anim.frame, -TRUCK_W / 2, -TRUCK_H + TRUCK_DY, TRUCK_W, TRUCK_H, map.flip);
+  ctx.restore();
+}
+
+/* ───────── UI: PLACAR / TOASTS ───────── */
+function updateScoreUI(bump) {
+  const sR = document.getElementById('scoreRosaEl');
+  const sA = document.getElementById('scoreAzulEl');
+  sR.textContent = game.scoreRosa;
+  sA.textContent = game.scoreAzul;
+  document.getElementById('giftsRosaEl').textContent = '🎁 ' + game.giftsRosa;
+  document.getElementById('giftsAzulEl').textContent = '🎁 ' + game.giftsAzul;
+  if (bump) {
+    [sR, sA].forEach(el => {
+      el.classList.add('bump');
+      setTimeout(() => el.classList.remove('bump'), 220);
+    });
+  }
+}
+
+function showToast(msg, type) {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+/* ───────── MAPEAMENTOS (presentes/comandos -> time + força) ───────── */
+let eventMappings = JSON.parse(localStorage.getItem('tug_mappings') || 'null') || {
+  // presente "Rose" (id 5655) e "TikTok" (id 5269) como exemplo inicial
+  "5655": { team: 'rosa', force: forceForStage(2), stage: 2 },
+  "5269": { team: 'azul', force: forceForStage(2), stage: 2 },
+};
+
+let likeConfig = JSON.parse(localStorage.getItem('tug_like_config') || 'null') || {
+  threshold: 10, team: 'rosa', force: forceForStage(1), stage: 1,
+};
+let likeCounter = 0;
+
+function saveMappings() {
+  localStorage.setItem('tug_mappings', JSON.stringify(eventMappings));
+}
+
+function giftLabel(key) {
+  const g = GIFT_CATALOG.find(g => g.id === key);
+  return g ? (key + ' — ' + g.name) : key;
+}
+
+function renderEventList() {
+  const el = document.getElementById('eventList');
+  const entries = Object.entries(eventMappings);
+  if (entries.length === 0) {
+    el.innerHTML = '<div style="opacity:.5; font-size:12px; padding:8px;">Nenhum mapeamento ainda. Adicione um presente ou comando acima.</div>';
+    return;
+  }
+  el.innerHTML = entries.map(([key, cfg]) => `
+    <div class="mapItem team-${cfg.team}">
+      <div class="mapInfo">
+        <b>${cfg.team === 'rosa' ? '🌸' : '🔵'}</b>
+        <span>${giftLabel(key)}</span>
+        <span style="opacity:.6;">→ Estágio ${cfg.stage || 1} (força ${cfg.force})</span>
+      </div>
+      <div style="display:flex; gap:4px; flex-shrink:0;">
+        <button class="btn btn-test" onclick="testTrigger('${key}')">Testar</button>
+        <button class="btn-del" onclick="deleteEvent('${key}')">×</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function populateGiftSelector() {
+  const sel = document.getElementById('giftSelector');
+  sel.innerHTML = '<option value="">-- Escolha um presente --</option><option value="CUSTOM">-- Digitar comando de chat --</option>' +
+    GIFT_CATALOG.map(g => `<option value="${g.id}">${g.id} - ${g.name}</option>`).join('');
+}
+
+function syncGiftInput() {
+  const sel = document.getElementById('giftSelector').value;
+  const cmdInput = document.getElementById('cmdInput');
+  if (sel && sel !== 'CUSTOM') { cmdInput.value = ''; }
+  else { cmdInput.focus(); }
+}
+
+function addEvent() {
+  const giftSel = document.getElementById('giftSelector').value;
+  const cmd = document.getElementById('cmdInput').value.trim().toLowerCase();
+  const team = document.getElementById('teamSelect').value;
+  const stage = parseInt(document.getElementById('stageSelect').value) || 1;
+  const force = forceForStage(stage);
+
+  let key = null;
+  if (giftSel && giftSel !== 'CUSTOM' && giftSel !== '') key = giftSel;
+  else if (cmd) key = cmd;
+
+  if (!key) { showToast('Escolha um presente ou digite um comando.', 'error'); return; }
+
+  eventMappings[key] = { team, force, stage };
+  saveMappings();
+  renderEventList();
+  document.getElementById('cmdInput').value = '';
+  document.getElementById('giftSelector').value = '';
+  showToast('Mapeamento adicionado!', 'success');
+}
+
+function deleteEvent(key) {
+  delete eventMappings[key];
+  saveMappings();
+  renderEventList();
+}
+
+function resetMappings() {
+  if (!confirm('Resetar todos os mapeamentos?')) return;
+  eventMappings = {};
+  saveMappings();
+  renderEventList();
+  showToast('Mapeamentos resetados!', 'success');
+}
+
+function testTrigger(key) {
+  const cfg = eventMappings[key];
+  if (!cfg) return;
+  addForce(cfg.team, cfg.force);
+}
+
+function saveLikeConfig() {
+  const stage = parseInt(document.getElementById('likeStageSelect').value) || 1;
+  likeConfig = {
+    threshold: Math.max(1, parseInt(document.getElementById('likeThresholdInput').value) || 10),
+    team: document.getElementById('likeTeamSelect').value,
+    force: forceForStage(stage),
+    stage,
+  };
+  localStorage.setItem('tug_like_config', JSON.stringify(likeConfig));
+  showToast('Configuração de likes salva!', 'success');
+}
+
+/* ───────── CONEXÃO TIKFINITY ───────── */
+function connectTikFinity() {
+  const socket = new WebSocket('ws://localhost:21213/');
+  const dot = document.getElementById('connDot');
+  const txt = document.getElementById('statusText');
+
+  socket.onopen = () => { dot.className = 'dot online'; txt.textContent = 'ONLINE'; };
+  socket.onclose = () => { dot.className = 'dot'; txt.textContent = 'OFFLINE'; setTimeout(connectTikFinity, 5000); };
+  socket.onerror = () => {};
+
+  socket.onmessage = (e) => {
+    try {
+      const res = JSON.parse(e.data);
+      const d = res.data || res;
+      const ev = (res.event || '').toLowerCase();
+
+      // ── PRESENTE ──
+      if (ev === 'gift') {
+        const giftId = String(d.giftId || '');
+        const giftName = String(d.giftName || '').toLowerCase().trim();
+        const cfg = eventMappings[giftId] || eventMappings[giftName];
+        if (cfg) addForce(cfg.team, cfg.force);
+        return;
+      }
+
+      // ── LIKE (com limite configurável) ──
+      if (ev === 'like') {
+        likeCounter += parseInt(d.likeCount) || 1;
+        if (likeCounter >= likeConfig.threshold) {
+          likeCounter = 0;
+          addForce(likeConfig.team, likeConfig.force);
+        }
+        return;
+      }
+
+      // ── CHAT / COMANDO ──
+      let triggerKey = '';
+      if (ev === 'chat') triggerKey = (d.comment || '').toLowerCase().trim();
+      if (ev === 'command') triggerKey = (d.command || '').toLowerCase().trim();
+      if (!triggerKey) return;
+      const cfg = eventMappings[triggerKey];
+      if (cfg) addForce(cfg.team, cfg.force);
+    } catch (err) { console.log(err); }
+  };
+}
+
+/* ══════════════════════════════════════
+   LOOP PRINCIPAL (blindado contra travamentos)
+══════════════════════════════════════ */
+let canvas, ctx, lastTime = 0;
+
+function loop(timestamp) {
+  try {
+    const dt = Math.min(3, (timestamp - lastTime) / 16.67 || 1);
+    lastTime = timestamp;
+    updateGame(dt);
+    drawScene(ctx);
+  } catch (err) {
+    console.error('[loop] erro no frame (jogo não vai travar):', err);
+  } finally {
+    requestAnimationFrame(loop);
+  }
+}
+
+/* ───────── EVENTOS DE UI ───────── */
+document.getElementById('configBtn').onclick = () => {
+  document.getElementById('configModal').classList.add('open');
+};
+document.getElementById('closeConfigBtn').onclick = () => {
+  document.getElementById('configModal').classList.remove('open');
+};
+document.getElementById('configModal').addEventListener('click', (e) => {
+  if (e.target.id === 'configModal') e.currentTarget.classList.remove('open');
+});
+
+/* ───────── BOOT ───────── */
+function init() {
+  canvas = document.getElementById('gameCanvas');
+  ctx = canvas.getContext('2d');
+
+  populateGiftSelector();
+  populateStageSelectors();
+  renderEventList();
+  document.getElementById('likeThresholdInput').value = likeConfig.threshold;
+  document.getElementById('likeTeamSelect').value = likeConfig.team;
+  document.getElementById('likeStageSelect').value = likeConfig.stage || 1;
+  updateScoreUI(false);
+
+  loadAssets(() => {
+    const overlay = document.getElementById('loadingOverlay');
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.style.display = 'none', 400);
+    requestAnimationFrame(loop);
+  });
+
+  connectTikFinity();
+}
+
+init();
+
+/* ============================================================
+   INTEGRAÇÃO COM O PAINEL StreamToEarn — postMessage API
+   O painel envia: { type: "TRUCK_ACTION", action: "FORCA_ROSA_3", user, avatar }
+   (mesmo protocolo usado pelo Pipa Interativa e pelo Squid Run)
+   action = "FORCA_<TIME>_<ESTAGIO>" onde TIME é ROSA ou AZUL e ESTAGIO é 1-5.
+   ============================================================ */
+window.addEventListener("message", function(evt) {
+  if (!evt.data || evt.data.type !== "TRUCK_ACTION") return;
+  const action = evt.data.action;
+  if (!action) return;
+  const m = /^FORCA_(ROSA|AZUL)_([1-5])$/.exec(String(action).toUpperCase());
+  if (!m) return;
+  const team = m[1].toLowerCase();
+  const stage = parseInt(m[2], 10);
+  addForce(team, forceForStage(stage));
+});
+
+// Avisar o painel que o jogo está pronto
+if (window.opener) {
+  window.opener.postMessage({ type: "TRUCK_READY" }, "*");
+}
+</script>
+</body>
+</html>

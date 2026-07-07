@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arena Arena - Sistema de Combate</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Bungee', cursive; background: #111; margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        
+        @keyframes shake {
+            0%, 100% { transform: scale(1) translate(0, 0) rotate(0deg); }
+            8% { transform: scale(1.03) translate(-8px, -6px) rotate(-0.7deg); }
+            18% { transform: scale(1.012) translate(8px, 6px) rotate(0.7deg); }
+            30% { transform: scale(1.022) translate(-6px, 4px); }
+            42% { transform: scale(1.008) translate(6px, -4px); }
+            55% { transform: scale(1.015) translate(-4px, 3px); }
+            68% { transform: scale(1.005) translate(4px, -2px); }
+            80% { transform: scale(1.01) translate(-2px, 1px); }
+            92% { transform: scale(1.002) translate(1px, -1px); }
+        }
+        /* Animações finitas com "punch zoom" de impacto embutido (sensação de golpe forte) */
+        .shake { animation: shake 0.32s ease-out; }
+        .shake-heavy { animation: shake 0.55s cubic-bezier(.36,.07,.19,.97); }
+
+        /* Flash de impacto ao sofrer dano */
+        @keyframes hitFlash {
+            0% { filter: brightness(1) saturate(1) drop-shadow(0 0 0 transparent); }
+            25% { filter: brightness(2.4) saturate(0) drop-shadow(0 0 18px #fff); }
+            100% { filter: brightness(1) saturate(1) drop-shadow(0 0 0 transparent); }
+        }
+        .flash-hit { animation: hitFlash 0.25s ease-out; }
+
+        /* Flash de tela colorido (dano, cura, evolução, combo) */
+        #flash-fight { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 999; pointer-events: none; mix-blend-mode: screen; }
+        @keyframes flashFight { 0% { opacity: 0.85; } 100% { opacity: 0; } }
+        .flash-active { animation: flashFight 0.35s ease-out; }
+
+        /* Sombra de chão sob os lutadores, para dar profundidade */
+        .sombra-chao { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); width: 120px; height: 18px; background: radial-gradient(ellipse at center, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.25) 55%, transparent 80%); z-index: 1; pointer-events: none; filter: blur(1px); }
+
+        /* Vinheta de perigo quando algum lutador está com vida crítica */
+        #vignette-low-hp { position: absolute; inset: 0; z-index: 350; pointer-events: none; box-shadow: inset 0 0 0 rgba(255,0,0,0); opacity: 0; transition: opacity 0.3s; }
+        #vignette-low-hp.ativa { opacity: 1; box-shadow: inset 0 0 140px rgba(255,0,0,0.55); animation: pulseVinheta 1s ease-in-out infinite; }
+        @keyframes pulseVinheta { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+        /* Partículas ambiente (poeira/brasas flutuando na arena) */
+        .particulas-ambiente { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 2; }
+        .particula { position: absolute; bottom: -10px; border-radius: 50%; background: rgba(255, 190, 90, 0.65); box-shadow: 0 0 6px rgba(255, 150, 40, 0.8); animation: subirParticula linear infinite; }
+        @keyframes subirParticula {
+            0% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 0.8; }
+            85% { opacity: 0.4; }
+            100% { transform: translateY(-560px) translateX(25px); opacity: 0; }
+        }
+
+        /* Partículas de impacto (faíscas/estilhaços que explodem no golpe) */
+        .particula-impacto { position: absolute; border-radius: 50%; pointer-events: none; z-index: 80; }
+
+        /* Onda de choque circular no ponto de impacto */
+        .onda-impacto { position: absolute; width: 16px; height: 16px; border: 4px solid #fff; border-radius: 50%; left: 50%; top: 150px; transform: translate(-50%, -50%); z-index: 85; pointer-events: none; box-shadow: 0 0 12px rgba(255,255,255,0.8); }
+
+        /* Onda de choque grande no início da luta */
+        .onda-fight { position: absolute; width: 50px; height: 50px; border: 6px solid #ff0055; border-radius: 50%; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 900; pointer-events: none; box-shadow: 0 0 20px #ff0055; }
+
+        /* Pulso dorado nos quadrados de vitória ao incrementar */
+        @keyframes pulseVitoria { 0% { transform: scale(1); } 50% { transform: scale(1.7); box-shadow: 0 0 14px gold; } 100% { transform: scale(1); } }
+        .vitoria-pulse { animation: pulseVitoria 0.45s ease; }
+
+        /* Entrada suave dos itens na fila de espera */
+        @keyframes entrarFila { 0% { opacity: 0; transform: translateY(18px) scale(0.8); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+
+        /* Popups de dano - estilo "mobile ad" bem exagerado e gostoso */
+        .popup { position: absolute; font-size: 42px; font-weight: 900; -webkit-text-stroke: 2px #000; text-shadow: 0 0 12px currentColor, 3px 3px 0 #000; z-index: 1000; pointer-events: none; animation: popDano 0.7s cubic-bezier(.17,.89,.32,1.49) forwards; font-family: 'Bungee', cursive; }
+        .popup.critico { font-size: 64px; text-shadow: 0 0 18px currentColor, 0 0 35px #fff, 4px 4px 0 #000; animation: popDanoCritico 0.85s cubic-bezier(.17,.89,.32,1.49) forwards; }
+        @keyframes popDano {
+            0% { transform: translateY(0) scale(0.3) rotate(var(--rot,0deg)); opacity: 1; }
+            15% { transform: translateY(-14px) scale(1.35) rotate(var(--rot,0deg)); }
+            32% { transform: translateY(-22px) scale(1) rotate(var(--rot,0deg)); }
+            100% { transform: translateY(-100px) scale(0.85) rotate(var(--rot,0deg)); opacity: 0; }
+        }
+        @keyframes popDanoCritico {
+            0% { transform: translateY(0) scale(0.15) rotate(0deg); opacity: 0; }
+            14% { transform: translateY(-18px) scale(1.55) rotate(-7deg); opacity: 1; }
+            28% { transform: translateY(-10px) scale(1.1) rotate(5deg); }
+            40% { transform: scale(1) rotate(-2deg); }
+            100% { transform: translateY(-130px) scale(0.95) rotate(0deg); opacity: 0; }
+        }
+
+        /* Banner de "X HITS!" para sequência de combo */
+        .streak-popup { position: fixed; font-size: 30px; font-weight: 900; font-family: 'Bungee', cursive; -webkit-text-stroke: 2px #000; text-shadow: 3px 3px 0 #000, 0 0 16px currentColor; z-index: 1100; pointer-events: none; transform: translate(-50%, -50%); animation: streakPop 0.7s cubic-bezier(.17,.89,.32,1.49) forwards; }
+        @keyframes streakPop {
+            0% { transform: translate(-50%, -50%) scale(0.2) rotate(-8deg); opacity: 0; }
+            20% { transform: translate(-50%, -50%) scale(1.3) rotate(4deg); opacity: 1; }
+            35% { transform: translate(-50%, -50%) scale(1) rotate(-2deg); }
+            80% { transform: translate(-50%, -55%) scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -70%) scale(0.9) rotate(0deg); opacity: 0; }
+        }
+
+        /* Banner gigante de K.O. ao final da luta */
+        #ko-banner { position: absolute; top: 48%; left: 50%; transform: translate(-50%, -50%); font-size: 88px; font-family: 'Bungee', cursive; color: #fff; -webkit-text-stroke: 4px #000; text-shadow: 0 0 30px gold, 0 0 60px #ff0055; z-index: 1500; pointer-events: none; letter-spacing: 4px; animation: koPop 1.2s cubic-bezier(.17,.89,.32,1.49) forwards; }
+        @keyframes koPop {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-18deg); opacity: 0; }
+            15% { transform: translate(-50%, -50%) scale(1.35) rotate(6deg); opacity: 1; }
+            26% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+            82% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(0.8) rotate(0deg); opacity: 0; }
+        }
+
+        /* Moedas de recompensa ao vencer (efeito "chuva de prêmio") */
+        .moeda { position: absolute; font-size: 26px; z-index: 90; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+
+        /* Arena aumentada para 600px para caber a fila maior */
+        .arena { width: 800px; height: 600px; background-image: url('assets/Theme.png'); background-size: cover; border: 4px solid #000; position: relative; overflow: hidden; box-shadow: 0 0 50px rgba(255, 0, 85, 0.3); }
+        
+        #txt-fight { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); color: #fff; font-size: 100px; text-shadow: 0 0 20px #ff0055, 4px 4px 0 #000; z-index: 1000; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: none; }
+        .show-fight { transform: translate(-50%, -50%) scale(1.2) !important; }
+        
+        .ui-vida { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-around; z-index: 300; }
+        .barra-container { width: 220px; height: 14px; background: #333; border: 2px solid #000; }
+        .barra-fill { height: 100%; background: #ff0055; transition: width 0.15s ease, background 0.3s ease, box-shadow 0.3s ease; width: 0%; }
+        
+        .quadrado-vitoria { display: inline-block; width: 20px; height: 20px; background: #ff0055; color: white; font-size: 14px; line-height: 20px; text-align: center; border: 1px solid #000; vertical-align: middle; margin: 0 5px; }
+        
+        .lutador { position: absolute; width: 350px; height: 350px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; z-index: 10; bottom: 160px; opacity: 0; transition: transform 0.3s ease; }
+        #pos-p1 { left: -500px; }
+        #pos-p2 { right: -500px; }
+        
+        .giant { transform: scale(1.2) !important; z-index: 20; }
+        
+        .sprite-img { width: 100%; height: auto; image-rendering: pixelated; }
+
+        .efeito-cura { position: absolute; width: 200px; height: 200px; background: radial-gradient(circle, rgba(0,255,0,0.6) 0%, transparent 70%); z-index: 50; pointer-events: none; border-radius: 50%; animation: pulseCura 0.4s ease-out forwards; bottom: 50px; }
+        @keyframes pulseCura { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.5); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+
+        .efeito-evolucao { position: absolute; width: 300px; height: 300px; background: radial-gradient(circle, #fff 0%, gold 40%, transparent 70%); z-index: 60; pointer-events: none; border-radius: 50%; animation: pulseEvolucao 0.8s ease-in-out forwards; bottom: 80px; }
+        @keyframes pulseEvolucao { 0% { transform: scale(0); opacity: 0; } 50% { transform: scale(2); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
+
+        .efeito-morte { position: absolute; width: 220px; height: 220px; background: radial-gradient(circle, rgba(200,200,200,0.6) 0%, rgba(110,110,110,0.3) 45%, transparent 75%); z-index: 55; pointer-events: none; border-radius: 50%; animation: pulseMorte 0.6s ease-out forwards; bottom: 60px; }
+        @keyframes pulseMorte { 0% { transform: scale(0.3); opacity: 0; } 40% { opacity: 0.9; } 100% { transform: scale(2.2); opacity: 0; } }
+
+   /* Fila aumentada para 160px para caber os nomes */
+ .container-fila { 
+    position: absolute; 
+    bottom: 0; 
+    width: 100%; 
+    height: 160px; 
+    background: transparent; /* Alterado para transparente */
+    border-top: 3px solid #ffffff; /* Alterado para branco */
+    display: flex; 
+    align-items: center; 
+    padding: 0 10px; 
+    overflow: hidden;
+    z-index: 200; 
+ }
+ /* nowrap explícito garante sempre UMA única fileira (itens que não cabem ficam ocultos pela arena) */
+ #lista-espera { list-style: none; display: flex; flex-wrap: nowrap; gap: 22px; margin: 0; padding: 0; align-items: flex-end; }
+ 
+ /* Cada item agora é um cartão único (avatar + nome sobreposto), evitando o efeito de "duas fileiras" */
+ .item-fila { position: relative; width: 115px; height: 132px; flex: 0 0 auto; animation: entrarFila 0.4s ease-out; }
+ .mini-sprite { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 115px; height: auto; image-rendering: pixelated; }
+ 
+/* Nome agora sobreposto como um selo na base do avatar, dentro do mesmo cartão (não forma mais uma fileira separada) */
+.nome-fila { 
+    position: absolute;
+    left: 50%;
+    bottom: 6px;
+    transform: translateX(-50%);
+    color: white; 
+    font-size: 11px; 
+    background: rgba(0,0,0,0.85); 
+    padding: 3px 9px; 
+    text-transform: uppercase; 
+    border: 2px solid #ffffff; 
+    box-shadow: 2px 2px 0 #000;
+    z-index: 220;
+    white-space: nowrap;
+    max-width: 105px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+        
+        .popup { position: absolute; font-size: 40px; text-shadow: 2px 2px 0 #000; z-index: 1000; animation: floatUp 0.4s forwards; font-weight: bold; pointer-events: none; }
+        @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-80px); opacity: 0; } }
+        
+        #bottom-bar { width: 800px; background: #000; padding: 10px; display: flex; justify-content: space-between; border: 1px solid #333; box-sizing: border-box; }
+        .btn-config { background: #222; color: gold; border: 1px solid gold; padding: 5px 15px; cursor: pointer; font-family: 'Bungee'; transition: 0.2s; }
+        
+        .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 480px; background: #1a1a1a; border: 2px solid gold; padding: 20px; z-index: 3000; display: none; color: white; box-shadow: 0 0 30px #000; }
+        .mapping-item { display: flex; justify-content: space-between; background: #222; margin-bottom: 5px; padding: 5px; font-size: 12px; }
+    </style>
+</head>
+<body onclick="audioHabilitado = true">
+
+    <audio id="snd-fight"><source src="assets/fight-292375.mp3" type="audio/mpeg"></audio>
+    <audio id="snd-hit"><source src="assets/sword-slice-2-393845.mp3" type="audio/mpeg"></audio>
+    <audio id="snd-sword"><source src="assets/sword-slice-2-393845pp.mp3" type="audio/mpeg"></audio>
+    <audio id="snd-heal"><source src="assets/heal-spell.mp3" type="audio/mpeg"></audio>
+    <audio id="snd-shot"><source src="assets/gunshot-352466.mp3" type="audio/mpeg"></audio>
+
+    <div class="arena" id="arena-main">
+        <div class="particulas-ambiente" id="particulas"></div>
+        <div id="flash-fight"></div>
+        <div id="txt-fight">FIGHT!</div>
+        <div id="vignette-low-hp"></div>
+        <div class="ui-vida">
+            <div class="barra-container"><div class="barra-fill" id="fill-p1"></div></div>
+            <div style="color: gold; font-size: 14px; margin-top: -5px;">VERSUS</div>
+            <div class="barra-container"><div class="barra-fill" id="fill-p2"></div></div>
+        </div>
+        
+        <div class="lutador" id="pos-p1">
+            <div class="sombra-chao"></div>
+            <div style="position: absolute; top: 100px; width: 100%; text-align: center;">
+                <span id="nome-p1" style="color:#fff; text-shadow:2px 2px #000;"></span>
+                <div id="win-p1" class="quadrado-vitoria">0</div>
+            </div>
+            <img src="" alt="" id="sprite-p1" class="sprite-img" decoding="sync">
+        </div>
+
+        <div class="lutador" id="pos-p2">
+            <div class="sombra-chao"></div>
+            <div style="position: absolute; top: 100px; width: 100%; text-align: center;">
+                <div id="win-p2" class="quadrado-vitoria">0</div>
+                <span id="nome-p2" style="color:#fff; text-shadow:2px 2px #000;"></span>
+            </div>
+            <img src="" alt="" id="sprite-p2" class="sprite-img" decoding="sync" style="transform: scaleX(-1);">
+        </div>
+
+        <div class="container-fila"><ul id="lista-espera"></ul></div>
+    </div>
+
+    <div id="bottom-bar" style="display:none;">
+        <div id="status-conn" style="color:red; font-size:12px;">● TIKFINITY DESCONECTADO</div>
+        <button class="btn-config" onclick="toggleModal()">⚙️ CONFIGURAR</button>
+    </div>
+
+    <div id="configModal" class="modal">
+        <h3 style="text-align:center; color:gold; margin-top:0;">COMANDOS</h3>
+        <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <input type="text" id="new-trigger" placeholder="Ex: lutar" style="flex:1; padding:5px; color: black;">
+            <select id="new-action" style="padding:5px; color: black;">
+                <option value="SPAWN_RANDOM">Lutar (Sorteio)</option>
+                <option value="SPAWN_FIGHTER">Lutador Normal</option>
+                <option value="SPAWN_SWORD">Lutador de Espada</option>
+                <option value="COMBO">Especial Combo</option>
+                <option value="SHOOT">Especial Arma</option>
+                <option value="HEAL_10">Cura 10%</option>
+                <option value="HEAL_30">Cura 30%</option>
+                <option value="HEAL_100">Cura 100%</option>
+            </select>
+            <button onclick="addMapping()" style="background:gold; padding:5px 10px; border: none; cursor: pointer;">+</button>
+        </div>
+        <div id="mapping-list" style="max-height: 150px; overflow-y: auto; margin-bottom: 10px;"></div>
+        <button onclick="toggleModal()" style="width:100%; padding:10px; cursor: pointer;">FECHAR</button>
+    </div>
+
+    <script>
+        // Lógica de combate e animação mantida exatamente como no original
+        let hp1 = 0, hp2 = 0, p1Ocupado = false, p2Ocupado = false, audioHabilitado = false;
+        let vitoriasP1 = 0, vitoriasP2 = 0, listaEspera = [], lutaIniciada = false, atacando = false;
+        let eventMappings = JSON.parse(localStorage.getItem('arena_events')) || { "lutar": "SPAWN_RANDOM" };
+
+        const CLASSES_DISPONIVEIS = ['fighter', 'sword'];
+        const POS_COMBATE = "195px"; 
+        const AVANCO_COMBO = 150; 
+
+        const animData = {
+            'IDLE': { start: 1, end: 8, folder: 'Idle' },
+            'WALK': { start: 9, end: 16, folder: 'walk' },
+            'RUN': { start: 17, end: 24, folder: 'run' },
+            'ATTACK': { start: 65, end: 77, folder: 'combo' }, 
+            'HURT': { start: 48, end: 51, folder: 'hit' },
+            'DIE': { start: 52, end: 61, folder: 'death' },
+            'SHOOT': { start: 65, end: 66, folder: 'shot' }
+        };
+
+        // ===== CORREÇÃO DO BUG DE "PISCAR": pré-carregamento de todos os frames =====
+        // Antes, a cada 50ms o jogo trocava o src da <img> sem o frame estar em cache,
+        // o que causava flash/flicker visível a cada troca de animação.
+        const imageCache = {};
+        function precarregarImagem(src) {
+            if (!imageCache[src]) {
+                const im = new Image();
+                im.src = src;
+                imageCache[src] = im;
+            }
+        }
+        function precarregarAcoes(tipo, acoes) {
+            acoes.forEach(actionKey => {
+                const conf = animData[actionKey];
+                if (!conf) return;
+                for (let f = conf.start; f <= conf.end; f++) {
+                    precarregarImagem(`assets/${tipo}_${conf.folder}_${String(f).padStart(4, '0')}.png`);
+                }
+            });
+        }
+        window.addEventListener('load', () => {
+            CLASSES_DISPONIVEIS.forEach(tipo => precarregarAcoes(tipo, Object.keys(animData)));
+            precarregarAcoes('pistol', ['SHOOT']); // pistol só existe para a animação de tiro
+        });
+
+        // Evita reatribuir o mesmo src repetidamente e blinda contra frames ausentes
+        // (sem isso, um frame faltante mostra o ícone de imagem quebrada piscando)
+        function configurarProtecaoSprite(imgId) {
+            const img = document.getElementById(imgId);
+            img.addEventListener('load', () => { img.dataset.lastGoodSrc = img.currentSrc || img.src; });
+            img.addEventListener('error', () => {
+                if (img.dataset.lastGoodSrc) img.src = img.dataset.lastGoodSrc;
+            });
+        }
+        configurarProtecaoSprite('sprite-p1');
+        configurarProtecaoSprite('sprite-p2');
+
+        function atualizarCorBarra(p, hpVal) {
+            const fill = document.getElementById(`fill-${p}`);
+            const v = Math.max(0, hpVal);
+            fill.style.width = v + "%";
+            if (v > 50) { fill.style.background = 'linear-gradient(90deg,#00e676,#00c853)'; fill.style.boxShadow = 'none'; }
+            else if (v > 20) { fill.style.background = 'linear-gradient(90deg,#ffeb3b,#ff9800)'; fill.style.boxShadow = '0 0 10px rgba(255,152,0,0.6)'; }
+            else { fill.style.background = 'linear-gradient(90deg,#ff1744,#d50000)'; fill.style.boxShadow = '0 0 14px rgba(255,23,68,0.9)'; }
+            atualizarVinheta();
+        }
+        function atualizarVinheta() {
+            const vin = document.getElementById('vignette-low-hp');
+            const perigo = (hp1 > 0 && hp1 <= 20) || (hp2 > 0 && hp2 <= 20);
+            vin.classList.toggle('ativa', perigo);
+        }
+
+        // Partículas ambiente decorativas (não interferem na lógica do jogo)
+        function criarParticulasAmbiente() {
+            const cont = document.getElementById('particulas');
+            for (let i = 0; i < 14; i++) {
+                const p = document.createElement('div');
+                p.className = 'particula';
+                const tam = (2 + Math.random() * 3);
+                p.style.width = tam + 'px';
+                p.style.height = tam + 'px';
+                p.style.left = (Math.random() * 100) + '%';
+                p.style.animationDuration = (6 + Math.random() * 6) + 's';
+                p.style.animationDelay = (Math.random() * 6) + 's';
+                cont.appendChild(p);
+            }
+        }
+        criarParticulasAmbiente();
+
+        // Rastro/afterimage visual durante avanços de combo e tiro
+        function criarRastro(p) {
+            const img = document.getElementById(`sprite-${p}`);
+            const ghost = img.cloneNode();
+            ghost.removeAttribute('id');
+            ghost.style.position = 'absolute';
+            ghost.style.left = '0';
+            ghost.style.top = '0';
+            ghost.style.opacity = '0.4';
+            ghost.style.filter = 'brightness(1.5) hue-rotate(10deg)';
+            ghost.style.pointerEvents = 'none';
+            ghost.style.transition = 'opacity 0.3s ease-out';
+            img.parentElement.appendChild(ghost);
+            requestAnimationFrame(() => { ghost.style.opacity = '0'; });
+            setTimeout(() => ghost.remove(), 320);
+        }
+
+        function flashSprite(p) {
+            const img = document.getElementById(`sprite-${p}`);
+            img.classList.remove('flash-hit');
+            void img.offsetWidth; // força reflow para reiniciar a animação
+            img.classList.add('flash-hit');
+        }
+
+        function tocarSom(id) {
+            const s = document.getElementById(id);
+            if (s) { s.currentTime = 0; s.play().catch(() => {}); }
+        }
+
+        // ===== SISTEMA DE "JUICE" / IMPACTO ESTILO ANÚNCIO MOBILE =====
+
+        // Hit-stop: congela brevemente as animações no momento do golpe (sensação de peso/impacto)
+        let hitStopAte = 0;
+        function aplicarHitStop(ms) { hitStopAte = Math.max(hitStopAte, Date.now() + ms); }
+
+        // Flash de tela colorido e configurável (dano = vermelho, cura/evolução = dourado, etc)
+        function flashTela(cor = '#fff') {
+            const flash = document.getElementById('flash-fight');
+            flash.style.background = cor;
+            flash.classList.remove('flash-active'); void flash.offsetWidth; flash.classList.add('flash-active');
+        }
+
+        // Explosão de partículas no ponto de impacto
+        function explosaoImpacto(p, cor = '#fff', qtd = 8, forte = false) {
+            const el = document.getElementById(`pos-${p}`);
+            for (let i = 0; i < qtd; i++) {
+                const part = document.createElement('div');
+                part.className = 'particula-impacto';
+                const tam = forte ? (6 + Math.random() * 9) : (3 + Math.random() * 5);
+                part.style.width = tam + 'px';
+                part.style.height = tam + 'px';
+                part.style.background = cor;
+                part.style.boxShadow = `0 0 ${forte ? 10 : 5}px ${cor}`;
+                part.style.left = (45 + Math.random() * 10) + '%';
+                part.style.top = '150px';
+                el.appendChild(part);
+                const angulo = Math.random() * Math.PI * 2;
+                const dist = forte ? (60 + Math.random() * 100) : (28 + Math.random() * 50);
+                const dx = Math.cos(angulo) * dist;
+                const dy = Math.sin(angulo) * dist - 25;
+                const dur = forte ? 600 : 400;
+                part.animate([
+                    { transform: 'translate(0,0) scale(1)', opacity: 1 },
+                    { transform: `translate(${dx}px, ${dy}px) scale(0.15)`, opacity: 0 }
+                ], { duration: dur, easing: 'cubic-bezier(.2,.8,.3,1)' });
+                setTimeout(() => part.remove(), dur + 30);
+            }
+        }
+
+        // Onda de choque circular no ponto de impacto
+        function ondaImpacto(p, cor = '#fff', escalaFinal = 5) {
+            const el = document.getElementById(`pos-${p}`);
+            const onda = document.createElement('div');
+            onda.className = 'onda-impacto';
+            onda.style.borderColor = cor;
+            onda.style.boxShadow = `0 0 14px ${cor}`;
+            el.appendChild(onda);
+            onda.animate([
+                { transform: 'translate(-50%,-50%) scale(0.3)', opacity: 0.9 },
+                { transform: `translate(-50%,-50%) scale(${escalaFinal})`, opacity: 0 }
+            ], { duration: 380, easing: 'ease-out' });
+            setTimeout(() => onda.remove(), 400);
+        }
+
+        // Rajada de ondas de choque no início da luta (impacto do "FIGHT!")
+        function rajadaCentral() {
+            const arena = document.getElementById('arena-main');
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                    const ring = document.createElement('div');
+                    ring.className = 'onda-fight';
+                    arena.appendChild(ring);
+                    ring.animate([
+                        { transform: 'translate(-50%,-50%) scale(0.2)', opacity: 0.9 },
+                        { transform: 'translate(-50%,-50%) scale(7)', opacity: 0 }
+                    ], { duration: 700, easing: 'ease-out' });
+                    setTimeout(() => ring.remove(), 720);
+                }, i * 110);
+            }
+        }
+
+        // Streak de combo: "X HITS!" quando um lutador acerta vários golpes seguidos sem ser atingido
+        const streak = { p1: 0, p2: 0 };
+        function registrarAcerto(atk, def) {
+            if (!atk || !state[atk]) return;
+            streak[atk] = (streak[atk] || 0) + 1;
+            streak[def] = 0;
+            if (streak[atk] >= 2) mostrarStreak(atk, streak[atk]);
+        }
+        function mostrarStreak(p, n) {
+            const cores = ['#ffffff', '#ffeb3b', '#ff9800', '#ff5722', '#ff1744'];
+            const cor = cores[Math.min(n - 2, cores.length - 1)];
+            const el = document.createElement('div');
+            el.className = 'streak-popup';
+            el.textContent = n + ' HITS!';
+            el.style.color = cor;
+            const rect = document.getElementById(`pos-${p}`).getBoundingClientRect();
+            el.style.left = (rect.left + rect.width / 2) + 'px';
+            el.style.top = (rect.top + 60) + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 700);
+        }
+
+        // Celebração de vitória: banner K.O. gigante + chuva de moedas
+        function celebracaoVitoria(win) {
+            const arena = document.getElementById('arena-main');
+            const ko = document.createElement('div');
+            ko.id = 'ko-banner';
+            ko.textContent = 'K.O.!';
+            arena.appendChild(ko);
+            setTimeout(() => ko.remove(), 1250);
+            for (let i = 0; i < 18; i++) setTimeout(() => criarMoeda(win), i * 35);
+        }
+        function criarMoeda(p) {
+            const el = document.getElementById(`pos-${p}`);
+            if (!el) return;
+            const moeda = document.createElement('div');
+            moeda.className = 'moeda';
+            moeda.textContent = '🪙';
+            moeda.style.left = (35 + Math.random() * 40) + '%';
+            moeda.style.top = '120px';
+            el.appendChild(moeda);
+            const dx = (Math.random() - 0.5) * 180;
+            const dur = 850 + Math.random() * 400;
+            moeda.animate([
+                { transform: 'translate(0,0) rotate(0deg) scale(0.4)', opacity: 1, offset: 0 },
+                { transform: `translate(${dx}px, -130px) rotate(180deg) scale(1.15)`, opacity: 1, offset: 0.5 },
+                { transform: `translate(${dx * 1.4}px, 70px) rotate(360deg) scale(0.8)`, opacity: 0, offset: 1 }
+            ], { duration: dur, easing: 'ease-in' });
+            setTimeout(() => moeda.remove(), dur + 50);
+        }
+
+        // Feedback completo de impacto: combina shake, partículas, onda, hit-stop e flash de tela
+        function executarFeedbackImpacto(def, ehForte) {
+            const arena = document.getElementById('arena-main');
+            const classeShake = ehForte ? 'shake-heavy' : 'shake';
+            arena.classList.remove('shake', 'shake-heavy'); void arena.offsetWidth; arena.classList.add(classeShake);
+            explosaoImpacto(def, ehForte ? '#ffae00' : '#ffffff', ehForte ? 16 : 8, ehForte);
+            ondaImpacto(def, ehForte ? '#ffae00' : '#ffffff', ehForte ? 6 : 4);
+            aplicarHitStop(ehForte ? 130 : 55);
+            if (ehForte) flashTela('rgba(255,255,255,0.9)');
+        }
+
+        const state = {
+            p1: { action: 'IDLE', frame: 1, tipo: "", nome: "", skinTemporaria: null, isGiant: false, vitoriasNoEstagio: 0 },
+            p2: { action: 'IDLE', frame: 1, tipo: "", nome: "", skinTemporaria: null, isGiant: false, vitoriasNoEstagio: 0 }
+        };
+
+        async function evoluirLutador(p, novaClasse) {
+            const el = document.getElementById(`pos-${p}`);
+            const arena = document.getElementById('arena-main');
+            arena.classList.remove('shake-heavy'); void arena.offsetWidth; arena.classList.add('shake-heavy');
+            const evo = document.createElement('div');
+            evo.className = 'efeito-evolucao';
+            el.appendChild(evo);
+            mostrarPopup(p, novaClasse === 'sword' ? "EVOLUÇÃO!" : "ELITE!", "gold");
+            await new Promise(r => setTimeout(r, 800));
+            state[p].tipo = 'sword'; 
+            if (novaClasse === 'giant') { state[p].isGiant = true; el.classList.add('giant'); }
+            flashSprite(p);
+            evo.remove();
+        }
+
+        function aplicarCura(p, valor) {
+            if (!state[p].nome) return;
+            if (p === 'p1') { hp1 = Math.min(100, hp1 + valor); atualizarCorBarra('p1', hp1); }
+            else { hp2 = Math.min(100, hp2 + valor); atualizarCorBarra('p2', hp2); }
+            const el = document.getElementById(`pos-${p}`);
+            const aura = document.createElement('div');
+            aura.className = 'efeito-cura';
+            el.appendChild(aura);
+            if (audioHabilitado) tocarSom('snd-heal');
+            mostrarPopup(p, `+${valor}% HP`, "#00ff00");
+            setTimeout(() => aura.remove(), 400);
+        }
+
+        async function executarCombo(atk) {
+            if (!lutaIniciada || atacando) return;
+            let def = (atk === 'p1') ? 'p2' : 'p1';
+            atacando = true;
+            const elAtk = document.getElementById(`pos-${atk}`);
+            const imgAtk = document.getElementById(`sprite-${atk}`);
+            const arena = document.getElementById('arena-main');
+            state[atk].action = 'RUN'; state[atk].frame = 17;
+            elAtk.style.transition = (atk === 'p1') ? "left 0.12s linear" : "right 0.12s linear";
+            const destino = (parseInt(POS_COMBATE) + AVANCO_COMBO) + "px";
+            if(atk === 'p1') elAtk.style.left = destino; else elAtk.style.right = destino;
+            criarRastro(atk);
+            await new Promise(r => setTimeout(r, 120));
+            imgAtk.style.transform = (atk === 'p1') ? "scaleX(-1)" : "scaleX(1)";
+            state[atk].action = 'ATTACK'; state[atk].frame = 65; 
+            setTimeout(() => { 
+                causarDano(def, 25, atk); 
+                mostrarPopup(atk, "COMBO!", "#ff0055", true);
+            }, 50);
+            await new Promise(r => setTimeout(r, 600));
+            state[atk].action = 'RUN'; state[atk].frame = 17;
+            elAtk.style.transition = (atk === 'p1') ? "left 0.15s ease-out" : "right 0.15s ease-out";
+            if(atk === 'p1') elAtk.style.left = POS_COMBATE; else elAtk.style.right = POS_COMBATE;
+            await new Promise(r => setTimeout(r, 150));
+            imgAtk.style.transform = (atk === 'p1') ? "scaleX(1)" : "scaleX(-1)";
+            state[atk].frame = 1; state[atk].action = 'IDLE';
+            atacando = false;
+        }
+
+        async function especialArma(atk) {
+            if (!state[atk].nome || !lutaIniciada || atacando) return;
+            let def = (atk === 'p1') ? 'p2' : 'p1';
+            atacando = true;
+            const elAtk = document.getElementById(`pos-${atk}`);
+            const imgAtk = document.getElementById(`sprite-${atk}`);
+            imgAtk.style.transform = (atk === 'p1') ? "scaleX(-1)" : "scaleX(1)"; 
+            state[atk].action = 'RUN'; state[atk].frame = 17;
+            elAtk.style.transition = "0.2s linear";
+            if(atk === 'p1') elAtk.style.left = "25px"; else elAtk.style.right = "25px";
+            criarRastro(atk);
+            await new Promise(r => setTimeout(r, 200));
+            state[atk].skinTemporaria = 'pistol'; 
+            imgAtk.style.transform = (atk === 'p1') ? "scaleX(1)" : "scaleX(-1)";
+            for(let i=0; i<2; i++) {
+                state[atk].action = 'SHOOT'; state[atk].frame = 65;
+                if (audioHabilitado) tocarSom('snd-shot');
+                setTimeout(() => { causarDano(def, 15, atk, 'silencioso'); mostrarPopup(atk, "POW!", "orange"); }, 50);
+                await new Promise(r => setTimeout(r, 300));
+            }
+            state[atk].skinTemporaria = null;
+            imgAtk.style.transform = (atk === 'p1') ? "scaleX(1)" : "scaleX(-1)";
+            state[atk].action = 'RUN'; state[atk].frame = 17;
+            elAtk.style.transition = "0.2s ease-out";
+            if(atk === 'p1') elAtk.style.left = POS_COMBATE; else elAtk.style.right = POS_COMBATE;
+            await new Promise(r => setTimeout(r, 200));
+            state[atk].frame = 1; state[atk].action = 'IDLE';
+            atacando = false;
+        }
+
+        function causarDano(def, dano, atkId, somPersonalizado = null) {
+            if (!lutaIniciada) return;
+            if (def === 'p1') hp1 -= dano; else hp2 -= dano;
+            atualizarCorBarra(def, def === 'p1' ? hp1 : hp2);
+
+            const ehForte = dano >= 20 || (atkId && (state[atkId].isGiant || state[atkId].tipo === 'sword'));
+            mostrarPopup(def, `-${dano}`, ehForte ? '#ff1744' : '#ff0055', ehForte);
+            flashSprite(def);
+            executarFeedbackImpacto(def, ehForte);
+            if (atkId) registrarAcerto(atkId, def);
+
+            if (audioHabilitado && somPersonalizado !== 'silencioso') {
+                const som = (atkId && (state[atkId].tipo === 'sword' || state[atkId].isGiant)) ? 'snd-sword' : 'snd-hit';
+                tocarSom(som);
+            }
+            if ((def === 'p1' ? hp1 : hp2) <= 0) {
+                lutaIniciada = false; atacando = false;
+                state[def].action = 'DIE'; state[def].frame = 52;
+                const win = (def === 'p1' ? 'p2' : 'p1');
+                if(win === 'p1') { vitoriasP1++; vitoriasP2 = 0; } else { vitoriasP2++; vitoriasP1 = 0; }
+                state[win].vitoriasNoEstagio++;
+                streak.p1 = 0; streak.p2 = 0;
+                if (state[win].vitoriasNoEstagio >= 5) {
+                    if (state[win].tipo === 'fighter') { evoluirLutador(win, 'sword'); state[win].vitoriasNoEstagio = 0; }
+                    else if (state[win].tipo === 'sword' && !state[win].isGiant) { evoluirLutador(win, 'giant'); state[win].vitoriasNoEstagio = 0; }
+                }
+                setTimeout(() => aplicarCura(win, 20), 400);
+                const elMorto = document.getElementById(`pos-${def}`);
+                const poeira = document.createElement('div');
+                poeira.className = 'efeito-morte';
+                elMorto.appendChild(poeira);
+                setTimeout(() => poeira.remove(), 650);
+                aplicarHitStop(260);
+                document.getElementById('arena-main').classList.remove('shake-heavy'); void document.getElementById('arena-main').offsetWidth; document.getElementById('arena-main').classList.add('shake-heavy');
+                flashTela('rgba(255,255,255,0.95)');
+                setTimeout(() => celebracaoVitoria(win), 150);
+                const winEl = document.getElementById(`win-${win}`);
+                winEl.innerText = (win === 'p1' ? vitoriasP1 : vitoriasP2);
+                winEl.classList.remove('vitoria-pulse'); void winEl.offsetWidth; winEl.classList.add('vitoria-pulse');
+                document.getElementById(`win-${def}`).innerText = (def === 'p1' ? vitoriasP1 : vitoriasP2);
+                setTimeout(() => removerLutador(def), 1500);
+            } else { state[def].action = 'HURT'; state[def].frame = 48; }
+        }
+
+        function handleAction(action, user, isTest = false) {
+            if (action.startsWith("SPAWN_")) {
+                let tipo = action.split("_")[1].toLowerCase();
+                if (tipo === "random") tipo = CLASSES_DISPONIVEIS[Math.floor(Math.random() * CLASSES_DISPONIVEIS.length)];
+                if(!isTest && (state.p1.nome === user || state.p2.nome === user || listaEspera.find(i => i.nome === user))) return;
+                const novo = { nome: user, tipo: tipo };
+                if (!p1Ocupado) { p1Ocupado = true; montarLutador('p1', novo); }
+                else if (!p2Ocupado) { p2Ocupado = true; montarLutador('p2', novo); }
+                else { listaEspera.push(novo); atualizarFila(); }
+            } else if (action === "SHOOT") { 
+                if(state.p1.nome === user) especialArma('p1'); else if(state.p2.nome === user) especialArma('p2');
+            } else if (action === "COMBO") {
+                if(state.p1.nome === user) executarCombo('p1'); else if(state.p2.nome === user) executarCombo('p2');
+            } else if (action.startsWith("HEAL_")) {
+                let v = parseInt(action.split("_")[1]);
+                if(state.p1.nome === user) aplicarCura('p1', v); else if(state.p2.nome === user) aplicarCura('p2', v);
+            }
+        }
+
+        function montarLutador(p, lutador) {
+            const el = document.getElementById(`pos-${p}`);
+            if (p === 'p1') hp1 = 100; else hp2 = 100;
+            state[p].tipo = lutador.tipo; state[p].nome = lutador.nome; state[p].action = 'WALK'; state[p].frame = 9;
+            state[p].isGiant = false; state[p].vitoriasNoEstagio = 0;
+            streak[p] = 0;
+            el.classList.remove('giant');
+            document.getElementById(`nome-${p}`).innerText = lutador.nome;
+            atualizarCorBarra(p, 100);
+            el.style.transition = "none"; el.style.opacity = "1";
+            if(p === 'p1') el.style.left = "-500px"; else el.style.right = "-500px";
+            setTimeout(() => {
+                el.style.transition = (p === 'p1') ? "left 3s linear" : "right 3s linear";
+                if(p === 'p1') el.style.left = POS_COMBATE; else el.style.right = POS_COMBATE;
+            }, 50);
+            setTimeout(() => {
+                state[p].action = 'IDLE'; state[p].frame = 1;
+                if(p1Ocupado && p2Ocupado && !lutaIniciada) iniciarLuta();
+            }, 3050);
+        }
+
+        setInterval(() => {
+            if (Date.now() < hitStopAte) return; // hit-stop: pausa breve para dar peso ao impacto
+            ['p1', 'p2'].forEach(p => {
+                const s = state[p]; if (!s.tipo || !s.nome) return;
+                const img = document.getElementById(`sprite-${p}`);
+                const conf = animData[s.action] || animData['IDLE'];
+                let lutadorAtual = s.skinTemporaria ? s.skinTemporaria : s.tipo;
+                const frameFormatado = String(s.frame).padStart(4, '0');
+                const novoSrc = `assets/${lutadorAtual}_${conf.folder}_${frameFormatado}.png`;
+                // Só troca o src se realmente mudou — evita repaint/flicker desnecessário
+                if (img.dataset.targetSrc !== novoSrc) {
+                    img.dataset.targetSrc = novoSrc;
+                    img.src = novoSrc;
+                }
+                img.style.visibility = "visible";
+                s.frame++;
+                if (s.frame > conf.end) {
+                    if (['ATTACK', 'SHOOT', 'HURT'].includes(s.action)) { s.action = 'IDLE'; s.frame = 1; }
+                    else if (s.action === 'DIE') s.frame = conf.end;
+                    else s.frame = conf.start;
+                }
+            });
+        }, 50);
+
+        setInterval(() => {
+            if (!lutaIniciada || atacando) return;
+            const atk = Math.random() > 0.5 ? 'p1' : 'p2';
+            const def = (atk === 'p1') ? 'p2' : 'p1';
+            let danoBase = 10;
+            if (state[atk].isGiant) danoBase = 20;
+            else if (state[atk].tipo === 'sword') danoBase = 15;
+            atacando = true; // trava para evitar que um combo/especial sobreponha esta animação
+            state[atk].action = 'ATTACK'; state[atk].frame = 65;
+            setTimeout(() => { if (lutaIniciada) causarDano(def, danoBase, atk); }, 250);
+            setTimeout(() => { atacando = false; }, 650); // libera só após a animação de ataque terminar
+        }, 800);
+
+        function removerLutador(p) {
+            const el = document.getElementById(`pos-${p}`);
+            el.style.transition = "opacity 0.4s"; el.style.opacity = "0";
+            setTimeout(() => {
+                if (p === 'p1') p1Ocupado = false; else p2Ocupado = false;
+                state[p].tipo = ""; state[p].nome = ""; 
+                document.getElementById(`sprite-${p}`).src = "";
+                if (listaEspera.length > 0) {
+                    const novo = listaEspera.shift();
+                    if(p === 'p1') p1Ocupado = true; else p2Ocupado = true;
+                    montarLutador(p, novo);
+                }
+                atualizarFila();
+            }, 500);
+        }
+
+        function iniciarLuta() {
+            const txt = document.getElementById('txt-fight');
+            const arena = document.getElementById('arena-main');
+            txt.classList.add('show-fight');
+            flashTela('rgba(255,255,255,0.9)');
+            arena.classList.remove('shake-heavy'); void arena.offsetWidth; arena.classList.add('shake-heavy');
+            rajadaCentral();
+            if (audioHabilitado) tocarSom('snd-fight');
+            setTimeout(() => { txt.classList.remove('show-fight'); lutaIniciada = true; }, 600);
+        }
+
+        // FUNÇÃO ATUALIZADA: Agora gera o HTML com o nome e imagem
+        function atualizarFila() { 
+            document.getElementById('lista-espera').innerHTML = listaEspera.map(l => 
+                `<li class="item-fila">
+                    <img src="assets/${l.tipo}_Idle_0001.png" class="mini-sprite">
+                    <span class="nome-fila">${l.nome}</span>
+                </li>`).join(''); 
+        }
+        
+        function mostrarPopup(p, txt, cor, critico = false) {
+            const pop = document.createElement('div');
+            pop.className = critico ? 'popup critico' : 'popup';
+            pop.innerText = txt;
+            pop.style.color = cor;
+            pop.style.setProperty('--rot', (Math.random() * 16 - 8) + 'deg');
+            const rect = document.getElementById(`pos-${p}`).getBoundingClientRect();
+            pop.style.left = (rect.left + 130 + Math.random() * 60) + "px";
+            pop.style.top = (rect.top + 40 + Math.random() * 20) + "px";
+            document.body.appendChild(pop);
+            setTimeout(() => pop.remove(), critico ? 850 : 700);
+        }
+        function toggleModal() { const m = document.getElementById('configModal'); m.style.display = (m.style.display === 'block') ? 'none' : 'block'; if(m.style.display === 'block') renderMappingList(); }
+        function addMapping() { const t = document.getElementById('new-trigger').value.toLowerCase().trim(); const a = document.getElementById('new-action').value; if(t) { eventMappings[t] = a; localStorage.setItem('arena_events', JSON.stringify(eventMappings)); renderMappingList(); document.getElementById('new-trigger').value = ""; } }
+        function renderMappingList() { const listDiv = document.getElementById('mapping-list'); listDiv.innerHTML = Object.entries(eventMappings).map(([trigger, action]) => `<div class="mapping-item"><span>${trigger} ➔ ${action}</span><button onclick="removeMapping('${trigger}')" style="background:red; color:white; border:none; padding:2px 5px; cursor:pointer;">X</button></div>`).join(''); }
+        function removeMapping(t) { delete eventMappings[t]; localStorage.setItem('arena_events', JSON.stringify(eventMappings)); renderMappingList(); }
+
+        function connectTikFinity() {
+            const socket = new WebSocket('ws://localhost:21213/');
+            socket.onopen = () => { document.getElementById('status-conn').style.color = '#2ecc71'; document.getElementById('status-conn').innerText = '● TIKFINITY CONECTADO'; };
+            socket.onmessage = (e) => {
+                const res = JSON.parse(e.data); if (!res.data) return;
+                const user = res.data.nickname || res.data.username;
+                const trigger = (res.event === "chat") ? res.data.comment : (res.event === "gift" ? res.data.giftName : res.event);
+                const action = eventMappings[trigger?.toLowerCase().trim()];
+                if (action) handleAction(action, user);
+            };
+            socket.onclose = () => setTimeout(connectTikFinity, 3000);
+            socket.onerror = () => { document.getElementById('status-conn').style.color = 'red'; document.getElementById('status-conn').innerText = '● TIKFINITY DESCONECTADO'; };
+        }
+        window.onload = connectTikFinity;
+
+        // ===== Integração com o Painel StreamToEarn (postMessage) =====
+        // O painel abre este jogo com window.open() e envia gatilhos via
+        // postMessage: {type:"STICK_ACTION", action, user, avatar}. Isso é
+        // independente da conexão TikFinity própria do jogo (acima) — as
+        // duas formas de disparo convivem em paralelo, igual ao Blade Arena,
+        // Puxa Truck e Squid Run.
+        window.addEventListener('message', (evt) => {
+            const msg = evt.data;
+            if (!msg || msg.type !== 'STICK_ACTION') return;
+            handleAction(msg.action, msg.user, false);
+        });
+        // Avisa o painel (se este jogo tiver sido aberto por ele) que já
+        // carregou e está pronto para receber comandos.
+        if (window.opener) {
+            try { window.opener.postMessage({ type: 'STICK_READY' }, '*'); } catch (e) {}
+        }
+
+        window.addEventListener('keydown', (e) => { 
+            if (e.key === '9') handleAction("SPAWN_RANDOM", "Teste_"+Math.floor(Math.random()*99), true);
+            if (e.key === '1' && p1Ocupado) executarCombo('p1');
+            if (e.key === '2' && p2Ocupado) executarCombo('p2');
+            if (e.key === '4' && p1Ocupado) especialArma('p1');
+            if (e.key === '5' && p2Ocupado) especialArma('p2');
+        });
+    </script>
+</body>
+</html>
